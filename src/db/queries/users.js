@@ -50,3 +50,14 @@ export const createUserProfile = async ({ user_id, lat, lon,skills,available_hou
   ]);
   return result.rows[0];
 };
+export const findUserByIdentifier = async (identifier) => {
+  const sql = `
+    SELECT id, email, password_hash
+    FROM users
+    WHERE email = $1 OR phone = $1
+    LIMIT 1
+  `;
+  const result = await query(sql, [identifier]);
+  return result.rows[0] || null;
+};
+
