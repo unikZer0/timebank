@@ -9,6 +9,11 @@ services:
     env_file: .env
     ports:
       - "3000:3000"
+    volumes:
+      - ./src:/usr/src/app/src:cached     
+      - ./package*.json:/usr/src/app/package*.json:cached
+      - ./node_modules:/usr/src/app/node_modules
+    command: npx nodemon --watch src --ext js,json src/index.js
     depends_on:
       - postgres
       - redis

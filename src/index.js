@@ -1,22 +1,25 @@
-// src/index.js
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import authRouter from './routes/authRoutes.js'
 
 dotenv.config();
 
 const app = express();
 
-// Middleware
+// middleware
 app.use(cors());
 app.use(bodyParser.json());
 
+app.use('/api/auth', authRouter);
 
-// Health check
-app.get('/', (req, res) => res.send('TimeBank API is running'));
+app.get('/', (req, res) => {
+  console.log("hii");
+  res.send('TimeBank API is running')
+});
 
-// Start server
+// server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
