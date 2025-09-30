@@ -1,2 +1,4 @@
 node_modules
 .env
+composyaml.txt
+compose.yaml

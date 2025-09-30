@@ -1,5 +1,4 @@
 version: "3.8"
-
 services:
   timebankbackend:
     build:
@@ -10,10 +9,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./src:/usr/src/app/src:cached     
-      - ./package*.json:/usr/src/app/package*.json:cached
-      - ./node_modules:/usr/src/app/node_modules
-    command: npx nodemon --watch src --ext js,json src/index.js
+      - ./src:/usr/src/app/src:cached
     depends_on:
       - postgres
       - redis
@@ -24,6 +20,8 @@ services:
       dockerfile: Dockerfile
     image: timebankworker
     env_file: .env
+    volumes:
+      - ./src:/usr/src/app/src:cached
     command: node src/workers/myWorker.js
     depends_on:
       - redis
@@ -42,7 +40,6 @@ services:
     volumes:
       - postgres-data-timebank:/var/lib/postgresql/data/pgdata
 
-
   redis:
     image: redis:7
     container_name: redis
@@ -56,7 +53,7 @@ services:
     container_name: pgadmin
     env_file: .env
     ports:
-      - "8080:80"
+      - "8082:80"
     depends_on:
       - postgres
     volumes:
