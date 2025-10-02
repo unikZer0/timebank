@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import authRouter from './routes/authRoutes.js'
-
+import jobAppRouter from './routes/job_appRoutes.js';
 dotenv.config();
 
 const app = express();
@@ -13,6 +13,9 @@ app.use(cors());
 app.use(bodyParser.json());
 
 app.use('/api/auth', authRouter);
+
+//job app routes
+app.use('/api', jobAppRouter);
 
 app.get('/', (req, res) => {
   console.log("hii");
