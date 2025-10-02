@@ -1,5 +1,5 @@
 import { query } from "../prosgresql.js";
-export const createJobApp = async ({ jobId, userId
+export const createJobAppQuery = async ({ jobId, userId
 }) => {
     // check if user already applied
     const existing = await query(

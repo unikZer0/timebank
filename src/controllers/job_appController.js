@@ -1,10 +1,10 @@
-import { createJobApp,getJobAppsByUserQuery,updateJobAppStatusQuery } from '../db/queries/job_app.js';
+import { createJobAppQuery,getJobAppsByUserQuery,updateJobAppStatusQuery } from '../db/queries/job_app.js';
 
 export const postJobApp = async (req, res) => {
     try {
         const { userId, jobId} = req.body;
 
-        const result = await createJobApp({ userId, jobId });
+        const result = await createJobAppQuery({ userId, jobId });
 
         res.json({
             success: true,
