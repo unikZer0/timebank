@@ -60,4 +60,62 @@ export const findUserByIdentifier = async (identifier) => {
   const result = await query(sql, [identifier]);
   return result.rows[0] || null;
 };
+export const updateRememberToken = async (userId, hash, expires) => {
+  const sql = `
+    UPDATE users
+    SET remember_token = $1,
+        remember_token_expires = $2
+    WHERE id = $3
+  `;
+  await query(sql, [hash, expires, userId]);
+};
+export const clearRememberToken = async (userId) => {
+  const sql = `
+    UPDATE users
+    SET remember_token = NULL,
+        remember_token_expires = NULL
+    WHERE id = $1
+  `;
+  await query(sql, [userId]);
+};
+export const findUserByRememberToken = async (token) => {
+  const sql = `
+    SELECT id, remember_token, remember_token_expires
+    FROM users
+    WHERE remember_token = $1 AND remember_token_expires > NOW()
+  `;
+  const result = await query(sql, [token]);
+  return result.rows[0] || null;
+};
+
+export const findUserByResetToken = async (token) => {
+  const sql = `
+    SELECT id, reset_token, reset_token_expires
+    FROM users
+    WHERE reset_token = $1 AND reset_token_expires > NOW()
+  `;
+  const result = await query(sql, [token]);
+  return result.rows[0] || null;
+};
+
+export const updateResetToken = async (userId, token, expires) => {
+  const sql = `
+    UPDATE users
+    SET reset_token = $1,
+        reset_token_expires = $2
+    WHERE id = $3
+  `;
+  await query(sql, [token, expires, userId]);
+};
+
+export const updatePassword = async (userId, passwordHash) => {
+  const sql = `
+    UPDATE users
+    SET password_hash = $1,
+        reset_token = NULL,
+        reset_token_expires = NULL
+    WHERE id = $2
+  `;
+  await query(sql, [passwordHash, userId]);
+};
 
