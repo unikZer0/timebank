@@ -4,7 +4,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import authRouter from './routes/authRoutes.js'
 import { rememberMeMiddleware } from "./middlewares/rememberMeMiddleware.js";
-
+import jobAppRouter from './routes/job_appRoutes.js';
 dotenv.config();
 
 const app = express();
@@ -18,6 +18,9 @@ app.use(cookieParser());
 
 app.use(rememberMeMiddleware);
 app.use('/api/auth', authRouter);
+
+//job app routes
+app.use('/api', jobAppRouter);
 
 app.get('/', (req, res) => {
   console.log("hii");
