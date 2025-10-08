@@ -1,3 +1,7 @@
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import { findUserByRememberToken } from '../db/queries/users.js';
+
 export const autoLoginMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -37,6 +41,7 @@ export const autoLoginMiddleware = async (req, res, next) => {
 
     return res.status(401).json({ message: "No valid remember me token" });
   } catch (err) {
+    console.error('autoLoginMiddleware error:', err);
     return res.status(401).json({ message: "Invalid token" });
   }
 };

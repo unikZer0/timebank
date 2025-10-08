@@ -78,14 +78,14 @@ export const clearRememberToken = async (userId) => {
   `;
   await query(sql, [userId]);
 };
-export const findUserByRememberToken = async (token) => {
+export const findUserByRememberToken = async () => {
   const sql = `
     SELECT id, email, role, remember_token, remember_token_expires
     FROM users
-    WHERE remember_token = $1 AND remember_token_expires > NOW()
+    WHERE remember_token IS NOT NULL AND remember_token_expires > NOW()
   `;
-  const result = await query(sql, [token]);
-  return result.rows[0] || null;
+  const result = await query(sql);
+  return result.rows || [];
 };
 
 export const findUserByResetToken = async (token) => {
