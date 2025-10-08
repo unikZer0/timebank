@@ -61,10 +61,22 @@ export const register = async (req, res) => {
 
         });
 
-    const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '24h' });
+    const token = jwt.sign({ 
+      userId: user.id, 
+      email: user.email, 
+      role: user.role || 'user' 
+    }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '24h' });
     console.log("token :" ,token);
     
-    res.status(201).json({message:"register successfully", user, token });
+    res.status(201).json({
+      message:"register successfully", 
+      user: { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role || 'user' 
+      }, 
+      token 
+    });
 
   } catch (err) {
     console.error(err);
@@ -85,13 +97,13 @@ export const login = async (req, res) => {
     if (!isValid) return res.status(401).json({ message: 'Invalid credentials' });
 
     const accessToken = jwt.sign(
-      { id: user.id, email: user.email },
+      { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' }
     );
 
     const refreshToken = jwt.sign(
-      { id: user.id, email: user.email },
+      { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
     );
@@ -112,7 +124,7 @@ export const login = async (req, res) => {
 
 
     return res.status(200).json({
-      user: { userId: user.id, email: user.email },
+      user: { userId: user.id, email: user.email, role: user.role },
       accessToken,
       refreshToken
     });
@@ -131,7 +143,7 @@ export const refreshToken = (req, res) => {
       if (err) return res.status(403).json({ message: 'Invalid refresh token' });
 
       const accessToken = jwt.sign(
-        { id: decoded.id, email: decoded.email },
+        { id: decoded.id, email: decoded.email, role: decoded.role },
         process.env.JWT_SECRET,
         { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' }
       );
@@ -227,13 +239,13 @@ export const autoLogin = async (req, res) => {
   try {
     if (req.autoLogin && req.userId) {
       const accessToken = jwt.sign(
-        { id: req.userId },
+        { id: req.userId, email: req.userEmail, role: req.userRole },
         process.env.JWT_SECRET,
         { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' }
       );
 
       const refreshToken = jwt.sign(
-        { id: req.userId },
+        { id: req.userId, email: req.userEmail, role: req.userRole },
         process.env.JWT_SECRET,
         { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
       );
@@ -246,8 +258,13 @@ export const autoLogin = async (req, res) => {
       });
 
       return res.status(200).json({
-        user: { userId: req.userId },
+        user: { 
+          userId: req.userId, 
+          email: req.userEmail, 
+          role: req.userRole 
+        },
         accessToken,
+        refreshToken,
         autoLogin: true
       });
     }
