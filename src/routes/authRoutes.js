@@ -20,5 +20,11 @@ router.post("/reset-password", resetPassword);
 router.post("/logout", authMiddleware, logout);
 router.get("/auto-login", autoLoginMiddleware, autoLogin);
 
+
+// //====================== Example admin-only route
+// router.delete("/admin/users/:id", authMiddleware, requireAdmin, deleteUser);
+
+// // Example role-based route  
+// router.put("/content/:id", authMiddleware, requireRole(['admin', 'moderator']), update);
 export default router;
 

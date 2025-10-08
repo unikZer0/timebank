@@ -12,7 +12,7 @@ export const createUser = async ({ first_name, last_name, email, passwordHash, n
 
 
 export const findUserByEmail = async (email) => {
-  const sql = `SELECT id, email, password_hash FROM users WHERE email = $1 LIMIT 1`;
+  const sql = `SELECT id, email, password_hash, role FROM users WHERE email = $1 LIMIT 1`;
   const result = await query(sql, [email]);
   return result.rows[0] || null;
 };
@@ -28,7 +28,7 @@ export const findUserPhone  = async (phone) => {
 };
 
 export const findUserById = async (id) => {
-  const sql = `SELECT id, email, created_at FROM users WHERE id = $1 LIMIT 1`;
+  const sql = `SELECT id, email, role, created_at FROM users WHERE id = $1 LIMIT 1`;
   const result = await query(sql, [id]);
   return result.rows[0] || null;
 };
@@ -52,7 +52,7 @@ export const createUserProfile = async ({ user_id, lat, lon,skills,available_hou
 };
 export const findUserByIdentifier = async (identifier) => {
   const sql = `
-    SELECT id, email, password_hash
+    SELECT id, email, password_hash, role
     FROM users
     WHERE email = $1 OR phone = $1
     LIMIT 1
@@ -80,7 +80,7 @@ export const clearRememberToken = async (userId) => {
 };
 export const findUserByRememberToken = async (token) => {
   const sql = `
-    SELECT id, remember_token, remember_token_expires
+    SELECT id, email, role, remember_token, remember_token_expires
     FROM users
     WHERE remember_token = $1 AND remember_token_expires > NOW()
   `;
