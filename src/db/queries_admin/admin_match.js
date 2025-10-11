@@ -24,3 +24,27 @@ export const getJobApplicantsQuery = async (jobId) => {
     const result = await query(sql, [jobId]);
     return result.rows;
 };
+
+export const getAdminJobsQuery = async () => {
+    const sql = `
+        SELECT
+            j.id,
+            j.title,
+            j.description,
+            j.required_skills,
+            j.location_lat,
+            j.location_lon,
+            j.broadcasted,
+            j.created_at,
+            u.id as creator_user_id,
+            u.email as creator_email,
+            u.first_name as creator_first_name,
+            u.last_name as creator_last_name
+        FROM jobs j
+        JOIN users u ON j.creator_user_id = u.id
+        ORDER BY j.created_at DESC
+    `;
+
+    const result = await query(sql);
+    return result.rows;
+};
