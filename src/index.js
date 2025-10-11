@@ -4,6 +4,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import authRouter from './routes/authRoutes.js'
 import verificationRouter from './routes_admin/verificationRoutes.js'
+import transferRouter from './routes/transferRoutes.js'
 import { rememberMeMiddleware } from "./middlewares/rememberMeMiddleware.js";
 import jobAppRouter from './routes/job_appRoutes.js';
 dotenv.config();
@@ -23,8 +24,11 @@ app.use(rememberMeMiddleware);
 app.use('/api/admin', verificationRouter);
 
 
+
 //====================================================
 app.use('/api/auth', authRouter);
+//=======transfer routes
+app.use('/api', transferRouter);
 
 //job app routes
 app.use('/api', jobAppRouter);
