@@ -2,8 +2,13 @@ import { getJobApplicantsQuery, getAdminJobsQuery } from "../db/queries_admin/ad
 
 export const getJobApplicants = async (req, res) => {
     try {
-        const { job_id } = req.params;
-        const applicants = await getJobApplicantsQuery(job_id);
+        const rawJobId = req.params.job_id;
+        const match = String(rawJobId).match(/\d+/);
+        if (!match) {
+            return res.status(400).json({ error: 'Invalid job_id parameter' });
+        }
+        const jobId = parseInt(match[0], 10);
+        const applicants = await getJobApplicantsQuery(jobId);
         res.json({ applicants });
     } catch (error) {
         console.error(error);
