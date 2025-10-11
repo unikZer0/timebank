@@ -2,11 +2,11 @@ import { query } from "../prosgresql.js";
 
 export const createUser = async ({ first_name, last_name, email, passwordHash, national_id, phone, status,dob }) => {
   const insertSql = `
-    INSERT INTO users (first_name, last_name, email, password_hash, national_id, phone, status,dob)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    INSERT INTO users (first_name, last_name, email, password_hash, national_id, phone, status, dob, verified)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     RETURNING *
   `;
-  const result = await query(insertSql, [first_name, last_name, email, passwordHash, national_id, phone, status,dob]);
+  const result = await query(insertSql, [first_name, last_name, email, passwordHash, national_id, phone, status, dob, false]);
   return result.rows[0];
 };
 
@@ -52,7 +52,7 @@ export const createUserProfile = async ({ user_id, lat, lon,skills,available_hou
 };
 export const findUserByIdentifier = async (identifier) => {
   const sql = `
-    SELECT id, email, password_hash, role
+    SELECT id, email, password_hash, role, status, verified
     FROM users
     WHERE email = $1 OR phone = $1
     LIMIT 1

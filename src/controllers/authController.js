@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import { createUser, findUserByEmail,findUserNationalId,findUserPhone,createUserProfile, findUserByIdentifier, updateRememberToken, clearRememberToken, findUserByResetToken, updateResetToken, updatePassword } from "../db/queries/users.js";
+import { createWallet } from "../db/queries/wallets.js";
 import { sendMail } from "../utils/mailer.js";
 import { log } from "console";
 dotenv.config();
@@ -69,11 +70,12 @@ export const register = async (req, res) => {
     console.log("token :" ,token);
     
     res.status(201).json({
-      message:"register successfully", 
+      message:"Registration successful. Your account is pending verification. You will be notified once approved by an administrator.", 
       user: { 
         id: user.id, 
         email: user.email, 
-        role: user.role || 'user' 
+        role: user.role || 'user',
+        status: user.status
       }, 
       token 
     });
@@ -95,6 +97,19 @@ export const login = async (req, res) => {
 
     const isValid = await bcrypt.compare(password, user.password_hash);
     if (!isValid) return res.status(401).json({ message: 'Invalid credentials' });
+
+    // Check if user is verified
+    if (user.status === 'pending' || !user.verified) {
+      return res.status(403).json({ 
+        message: 'Account pending verification. Please wait for admin approval.' 
+      });
+    }
+
+    if (user.status === 'rejected') {
+      return res.status(403).json({ 
+        message: 'Account verification was rejected. Please contact support.' 
+      });
+    }
 
     const accessToken = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
