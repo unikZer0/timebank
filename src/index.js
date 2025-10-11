@@ -7,16 +7,14 @@ import verificationRouter from './routes_admin/verificationRoutes.js'
 import transferRouter from './routes/transferRoutes.js'
 import { rememberMeMiddleware } from "./middlewares/rememberMeMiddleware.js";
 import jobAppRouter from './routes/job_appRoutes.js';
+import adminMatchRouter from './routes/admin_matchRoutes.js';
 dotenv.config();
 
 const app = express();
 
 // middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
-
+app.use(bodyParser.json());
 
 app.use(rememberMeMiddleware);
 
@@ -32,6 +30,9 @@ app.use('/api', transferRouter);
 
 //job app routes
 app.use('/api', jobAppRouter);
+// admin match routes
+app.use('/api', adminMatchRouter);
+
 
 app.get('/', (req, res) => {
   console.log("hii");
