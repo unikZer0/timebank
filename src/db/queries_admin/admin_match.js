@@ -25,6 +25,67 @@ export const getJobApplicantsQuery = async (jobId) => {
     return result.rows;
 };
 
+export const createAdminMatchQuery = async (job_id, user_id, reason) => {
+    const sql = `
+        INSERT INTO admin_matches (job_id, user_id, reason)
+        VALUES ($1, $2, $3)
+        RETURNING *
+    `;
+    const result = await query(sql, [job_id, user_id, reason]);
+    return result.rows[0];
+};
+
+export const getAdminMatchesQuery = async () => {
+    const sql = `
+        SELECT
+            am.id,
+            am.job_id,
+            am.user_id,
+            am.reason,
+            am.created_at,
+            j.title as job_title,
+            u.email as user_email
+        FROM admin_matches am
+        JOIN jobs j ON am.job_id = j.id
+        JOIN users u ON am.user_id = u.id
+        ORDER BY am.created_at DESC
+    `;
+    const result = await query(sql);
+    return result.rows;
+};
+
+export const updateAdminMatchQuery = async (id, job_id, user_id, reason) => {
+    const sql = `
+        UPDATE admin_matches
+        SET job_id = $2, user_id = $3, reason = $4
+        WHERE id = $1
+        RETURNING *
+    `;
+    const result = await query(sql, [id, job_id, user_id, reason]);
+    return result.rows[0];
+};
+
+export const deleteAdminMatchQuery = async (id) => {
+    const sql = `
+        DELETE FROM admin_matches
+        WHERE id = $1
+        RETURNING *
+    `;
+    const result = await query(sql, [id]);
+    return result.rows[0];
+};
+
+export const updateJobApplicationStatusQuery = async (id, status) => {
+    const sql = `
+        UPDATE job_applications
+        SET status = $2
+        WHERE id = $1
+        RETURNING *
+    `;
+    const result = await query(sql, [id, status]);
+    return result.rows[0];
+};
+
 export const getAdminJobsQuery = async () => {
     const sql = `
         SELECT
