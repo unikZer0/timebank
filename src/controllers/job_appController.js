@@ -2,7 +2,10 @@ import { createJobAppQuery,getJobAppsByUserQuery,updateJobAppStatusQuery } from 
 
 export const postJobApp = async (req, res) => {
     try {
-        const { userId, jobId} = req.body;
+        const userIdFromToken = req.userId || null;
+        const { userId: userIdFromBody, jobId} = req.body;
+
+        const userId = userIdFromToken || userIdFromBody;
 
         const result = await createJobAppQuery({ userId, jobId });
 
