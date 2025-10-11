@@ -7,7 +7,7 @@ import verificationRouter from './routes_admin/verificationRoutes.js'
 import transferRouter from './routes/transferRoutes.js'
 import { rememberMeMiddleware } from "./middlewares/rememberMeMiddleware.js";
 import jobAppRouter from './routes/job_appRoutes.js';
-import adminMatchRouter from './routes/admin_matchRoutes.js';
+import adminMatchRouter from './routes_admin/admin_matchRoutes.js';
 dotenv.config();
 
 const app = express();
