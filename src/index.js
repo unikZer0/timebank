@@ -21,7 +21,8 @@ app.use(rememberMeMiddleware);
 //=======admin
 app.use('/api/admin', verificationRouter);
 
-
+// admin match routes
+app.use('/api', adminMatchRouter);
 
 //====================================================
 app.use('/api/auth', authRouter);
@@ -30,8 +31,7 @@ app.use('/api', transferRouter);
 
 //job app routes
 app.use('/api', jobAppRouter);
-// admin match routes
-app.use('/api', adminMatchRouter);
+
 
 
 app.get('/', (req, res) => {
