@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>New User Registration - TimeBank</title>
+</head>
+<body style="font-family:sans-serif;line-height:1.5;">
+  <div style="background:#f1f1f1;padding:10px;text-align:center;">
+    <h1>TimeBank Admin</h1>
+  </div>
+  
+  <div style="padding:20px;">
+    <h2>New User Registration</h2>
+    <p>A new user has registered and is pending verification:</p>
+    
+    <div style="background:#f9f9f9;padding:15px;border-left:4px solid #007bff;margin:15px 0;">
+      <p><strong>Name:</strong> {{user_name}}</p>
+      <p><strong>Email:</strong> {{user_email}}</p>
+      <p><strong>Registration Date:</strong> {{registration_date}}</p>
+    </div>
+    
+    <p>Please review the user's information and verify or reject their account in the admin panel.</p>
+    
+    <p>
+      <a href="{{admin_panel_url}}" style="background:#007bff;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">Go to Admin Panel</a>
+    </p>
+  </div>
+  
+  <div style="background:#f1f1f1;padding:10px;text-align:center;font-size:12px;color:#555;">
+    &copy; {{year}} TimeBank. All rights reserved.
+  </div>
+</body>
+</html>

@@ -10,6 +10,7 @@ services:
       - "3000:3000"
     volumes:
       - ./src:/usr/src/app/src:cached
+      - ./templates:/usr/src/app/templates:cached
     depends_on:
       - postgres
       - redis
@@ -22,7 +23,8 @@ services:
     env_file: .env
     volumes:
       - ./src:/usr/src/app/src:cached
-    command: node src/workers/myWorker.js
+      - ./templates:/usr/src/app/templates:cached
+    command: node src/workers/notificationWorker.js
     depends_on:
       - redis
       - postgres

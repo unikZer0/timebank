@@ -2,9 +2,11 @@ import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
-import { createUser, findUserByEmail,findUserNationalId,findUserPhone,createUserProfile, findUserByIdentifier, updateRememberToken, clearRememberToken, findUserByResetToken, updateResetToken, updatePassword } from "../db/queries/users.js";
+import { createUser, findUserByEmail,findUserNationalId,findUserPhone,createUserProfile, findUserByIdentifier, updateRememberToken, clearRememberToken, findUserByResetToken, updateResetToken, updatePassword, updateUserCurrentLocation } from "../db/queries/users.js";
 import { createWallet } from "../db/queries/wallets.js";
-import { sendMail } from "../utils/mailer.js";
+import { notifyAdminsNewUser } from "../queues/notificationQueue.js";
+import { handleLineLoginCallback } from "../services/lineService.js";
+import { query } from "../db/prosgresql.js";
 import { log } from "console";
 dotenv.config();
 
@@ -69,6 +71,13 @@ export const register = async (req, res) => {
     }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '24h' });
     console.log("token :" ,token);
     
+    try {
+      await notifyAdminsNewUser(user);
+      console.log(`New user registration notification queued for user ${user.id}`);
+    } catch (error) {
+      console.error("Error queuing admin notifications:", error);
+    }
+    
     res.status(201).json({
       message:"Registration successful. Your account is pending verification. You will be notified once approved by an administrator.", 
       user: { 
@@ -89,7 +98,7 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { identifier, password, remember } = req.body;
+    const { identifier, password, remember, currentLat, currentLon } = req.body;
     if (!identifier || !password) return res.status(400).json({ message: 'Identifier and password required' });
 
     const user = await findUserByIdentifier(identifier);
@@ -98,7 +107,6 @@ export const login = async (req, res) => {
     const isValid = await bcrypt.compare(password, user.password_hash);
     if (!isValid) return res.status(401).json({ message: 'Invalid credentials' });
 
-    // Check if user is verified
     if (user.status === 'pending' || !user.verified) {
       return res.status(403).json({ 
         message: 'Account pending verification. Please wait for admin approval.' 
@@ -109,6 +117,14 @@ export const login = async (req, res) => {
       return res.status(403).json({ 
         message: 'Account verification was rejected. Please contact support.' 
       });
+    }
+    if (currentLat !== undefined && currentLon !== undefined) {
+      try {
+        await updateUserCurrentLocation(user.id, parseFloat(currentLat), parseFloat(currentLon));
+        console.log(`Updated current location for user ${user.id}: ${currentLat}, ${currentLon}`);
+      } catch (locationError) {
+        console.error('Error updating current location:', locationError);
+      }
     }
 
     const accessToken = jwt.sign(
@@ -288,5 +304,95 @@ export const autoLogin = async (req, res) => {
   } catch (err) {
     console.error('autoLogin error', err);
     res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const updateCurrentLocation = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { currentLat, currentLon } = req.body;
+
+    if (currentLat === undefined || currentLon === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Current latitude and longitude are required' 
+      });
+    }
+
+    const updatedProfile = await updateUserCurrentLocation(userId, parseFloat(currentLat), parseFloat(currentLon));
+
+    if (!updatedProfile) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User profile not found' 
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Current location updated successfully',
+      data: {
+        current_lat: updatedProfile.current_lat,
+        current_lon: updatedProfile.current_lon,
+        updated_at: updatedProfile.updated_at
+      }
+    });
+
+  } catch (error) {
+    console.error('Error updating current location:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
+  }
+};
+
+/**
+ * Handle LINE Login callback
+ * Links LINE account to existing user account
+ */
+export const lineLoginCallback = async (req, res) => {
+  try {
+    const { code, state } = req.query; // state = user email from frontend
+
+    if (!code || !state) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing authorization code or state parameter' 
+      });
+    }
+
+    console.log('LINE Login callback received:', { code: code.substring(0, 10) + '...', state });
+
+    // Handle LINE login callback
+    const lineProfile = await handleLineLoginCallback(code, state);
+    
+    if (!lineProfile || !lineProfile.userId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Failed to get LINE profile' 
+      });
+    }
+
+    const { userId: lineUserId, email } = lineProfile;
+    const user = await findUserByEmail(email);
+    if (!user) {
+      console.error('User not found for email:', email);
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3001'}/link-line?error=user_not_found`);
+    }
+    const existingLink = await query("SELECT id, email FROM users WHERE line_user_id=$1 AND email!=$2", [lineUserId, email]);
+    if (existingLink.rows.length > 0) {
+      console.error('LINE account already linked to another user:', existingLink.rows[0].email);
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3001'}/link-line?error=already_linked`);
+    }
+    await query("UPDATE users SET line_user_id=$1 WHERE email=$2", [lineUserId, email]);
+    
+    console.log(` LINE account linked successfully for user ${user.id} (${email})`);
+
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3001'}/link-line?success=true`);
+
+  } catch (error) {
+    console.error('LINE login callback error:', error);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3001'}/link-line?error=server_error`);
   }
 };

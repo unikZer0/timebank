@@ -35,7 +35,7 @@ export const getJobAppsByUser = async (req, res) => {
 export const updateJobAppStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, employerId } = req.body;
+        const { status, employerId } = req.body;   
 
         const success = await updateJobAppStatusQuery(id, status, employerId);
         if (!success) {
