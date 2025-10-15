@@ -18,8 +18,6 @@ export const transferHours = async (req, res) => {
                 message: "Recipient user ID and hours are required"
             });
         }
-
-        // Convert hours to number and validate
         const hoursToTransfer = parseFloat(hours);
         if (isNaN(hoursToTransfer) || hoursToTransfer <= 0) {
             return res.status(400).json({
@@ -55,7 +53,6 @@ export const transferHours = async (req, res) => {
 
         const transaction = await createTransfer(fromUserId, toUserId, hoursToTransfer, 'transfer');
 
-        // Update both wallets with proper numeric values
         const newSenderBalance = parseFloat(senderBalance) - hoursToTransfer;
         const newRecipientBalance = parseFloat(recipientBalance) + hoursToTransfer;
 
@@ -110,8 +107,6 @@ export const getTransferHistoryCtrl = async (req, res) => {
         });
     }
 };
-
-// Get family members
 export const getFamilyMembersCtrl = async (req, res) => {
     try {
         const userId = req.userId;
@@ -131,8 +126,6 @@ export const getFamilyMembersCtrl = async (req, res) => {
         });
     }
 };
-
-// Get user's wallet balance (hours)
 export const getWalletBalanceCtrl = async (req, res) => {
     try {
         const userId = req.userId;

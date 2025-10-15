@@ -53,13 +53,13 @@ export const verifyUserQuery = async (userId) => {
     }
 };
 
-export const rejectUserQuery = async (userId) => {
+export const rejectUserQuery = async (userId, rejectionReason = null) => {
     const sql = `
         UPDATE users 
-        SET status = 'rejected', verified = false
+        SET status = 'rejected', verified = false, rejection_reason = $2
         WHERE id = $1 AND status = 'pending'
         RETURNING *
     `;
-    const result = await query(sql, [userId]);
+    const result = await query(sql, [userId, rejectionReason]);
     return result.rows[0] || null;
 };

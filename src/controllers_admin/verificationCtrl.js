@@ -4,6 +4,7 @@ import {
     verifyUserQuery,
     rejectUserQuery
 } from "../db/queries_admin/verification.js";
+import { notifyUserVerification } from "../queues/notificationQueue.js";
 
 export const getUnverifiedUsers = async (req, res) => {
     try {
@@ -57,6 +58,7 @@ export const getUserDetails = async (req, res) => {
 export const verifyUser = async (req, res) => {
     try {
         const { userId } = req.params;
+        const adminName = req.userEmail || 'Administrator';
         
         if (!userId) {
             return res.status(400).json({
@@ -75,6 +77,12 @@ export const verifyUser = async (req, res) => {
         }
 
         const { user, wallet } = result;
+        try {
+            await notifyUserVerification(userId, 'verified', adminName);
+            console.log(`User verification notification queued for user ${userId}`);
+        } catch (error) {
+            console.error("Error queuing user verification notification:", error);
+        }
 
         res.status(200).json({
             success: true,
@@ -102,6 +110,8 @@ export const verifyUser = async (req, res) => {
 export const rejectUser = async (req, res) => {
     try {
         const { userId } = req.params;
+        const { rejectionReason } = req.body;
+        const adminName = req.userEmail || 'Administrator';
         
         if (!userId) {
             return res.status(400).json({
@@ -110,13 +120,19 @@ export const rejectUser = async (req, res) => {
             });
         }
 
-        const rejectedUser = await rejectUserQuery(userId);
+        const rejectedUser = await rejectUserQuery(userId, rejectionReason);
         
         if (!rejectedUser) {
             return res.status(404).json({
                 success: false,
                 message: "User not found or already processed"
             });
+        }
+        try {
+            await notifyUserVerification(userId, 'rejected', adminName, rejectionReason);
+            console.log(`User rejection notification queued for user ${userId}`);
+        } catch (error) {
+            console.error("Error queuing user rejection notification:", error);
         }
 
         res.status(200).json({
@@ -125,7 +141,8 @@ export const rejectUser = async (req, res) => {
             data: {
                 id: rejectedUser.id,
                 email: rejectedUser.email,
-                status: rejectedUser.status
+                status: rejectedUser.status,
+                rejection_reason: rejectedUser.rejection_reason
             }
         });
     } catch (error) {

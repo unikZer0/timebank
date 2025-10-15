@@ -32,6 +32,19 @@ export const createAdminMatchQuery = async (job_id, user_id, reason) => {
         RETURNING *
     `;
     const result = await query(sql, [job_id, user_id, reason]);
+    
+    // Automatically create a job application with 'applied' status when admin creates a match
+    try {
+        await query(
+            'INSERT INTO job_applications (job_id, user_id, status) VALUES ($1, $2, $3) ON CONFLICT (job_id, user_id) DO NOTHING',
+            [job_id, user_id, 'applied']
+        );
+        console.log(`Job application created for admin match: job ${job_id}, user ${user_id}`);
+    } catch (error) {
+        console.error('Error creating job application for admin match:', error);
+        // Don't throw error here as the admin match was created successfully
+    }
+    
     return result.rows[0];
 };
 
@@ -86,6 +99,35 @@ export const updateJobApplicationStatusQuery = async (id, status) => {
     return result.rows[0];
 };
 
+export const getAdminMatchByIdQuery = async (matchId) => {
+    const sql = `
+        SELECT
+            am.id,
+            am.job_id,
+            am.user_id,
+            am.reason,
+            am.created_at,
+            j.id as job_id,
+            j.title,
+            j.description,
+            j.required_skills,
+            j.location_lat,
+            j.location_lon,
+            j.time_balance_hours,
+            u.id as user_id,
+            u.email,
+            u.first_name,
+            u.last_name,
+            u.line_user_id
+        FROM admin_matches am
+        JOIN jobs j ON am.job_id = j.id
+        JOIN users u ON am.user_id = u.id
+        WHERE am.id = $1
+    `;
+    const result = await query(sql, [matchId]);
+    return result.rows[0] || null;
+};
+
 export const getAdminJobsQuery = async () => {
     const sql = `
         SELECT
@@ -95,6 +137,7 @@ export const getAdminJobsQuery = async () => {
             j.required_skills,
             j.location_lat,
             j.location_lon,
+            j.time_balance_hours,
             j.broadcasted,
             j.created_at,
             u.id as creator_user_id,
@@ -103,6 +146,35 @@ export const getAdminJobsQuery = async () => {
             u.last_name as creator_last_name
         FROM jobs j
         JOIN users u ON j.creator_user_id = u.id
+        ORDER BY j.created_at DESC
+    `;
+
+    const result = await query(sql);
+    return result.rows;
+};
+
+export const getJobsForMatchingQuery = async () => {
+    const sql = `
+        SELECT
+            j.id,
+            j.title,
+            j.description,
+            j.required_skills,
+            j.location_lat,
+            j.location_lon,
+            j.time_balance_hours,
+            j.broadcasted,
+            j.created_at,
+            u.id as creator_user_id,
+            u.email as creator_email,
+            u.first_name as creator_first_name,
+            u.last_name as creator_last_name,
+            COUNT(ja.id) as application_count
+        FROM jobs j
+        JOIN users u ON j.creator_user_id = u.id
+        LEFT JOIN job_applications ja ON j.id = ja.job_id
+        WHERE j.broadcasted = true
+        GROUP BY j.id, u.id
         ORDER BY j.created_at DESC
     `;
 

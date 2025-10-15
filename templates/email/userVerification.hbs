@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Account Verification - TimeBank</title>
+</head>
+<body style="font-family:sans-serif;line-height:1.5;">
+  <div style="background:#f1f1f1;padding:10px;text-align:center;">
+    <h1>TimeBank</h1>
+  </div>
+  
+  <div style="padding:20px;">
+    <h2>{{title}}</h2>
+    
+    {{#if isVerified}}
+    <div style="background:#d4edda;padding:15px;border-left:4px solid #28a745;margin:15px 0;">
+      <p style="color:#155724;margin:0;"><strong>Congratulations!</strong> Your account has been verified.</p>
+    </div>
+    
+    <p>Hello {{first_name}},</p>
+    <p>Great news! Your account has been verified by our administrator. You can now:</p>
+    <ul>
+      <li>Access all platform features</li>
+      <li>Apply for jobs</li>
+      <li>Post your own services</li>
+      <li>Start earning time credits</li>
+    </ul>
+    
+    <p>
+      <a href="{{login_url}}" style="background:#28a745;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">Login to Your Account</a>
+    </p>
+    {{else}}
+    <div style="background:#f8d7da;padding:15px;border-left:4px solid #dc3545;margin:15px 0;">
+      <p style="color:#721c24;margin:0;"><strong>Account Verification Rejected</strong></p>
+    </div>
+    
+    <p>Hello {{first_name}},</p>
+    <p>We regret to inform you that your account verification was rejected. This could be due to:</p>
+    <ul>
+      <li>Incomplete or inaccurate information</li>
+      <li>Documentation issues</li>
+      <li>Policy compliance concerns</li>
+    </ul>
+    
+    <p>Please contact our support team for more information about the rejection and how to proceed.</p>
+    
+    <p>
+      <a href="{{support_url}}" style="background:#dc3545;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">Contact Support</a>
+    </p>
+    {{/if}}
+  </div>
+  
+  <div style="background:#f1f1f1;padding:10px;text-align:center;font-size:12px;color:#555;">
+    &copy; {{year}} TimeBank. All rights reserved.
+  </div>
+</body>
+</html>

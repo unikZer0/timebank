@@ -28,7 +28,7 @@ export const findUserPhone  = async (phone) => {
 };
 
 export const findUserById = async (id) => {
-  const sql = `SELECT id, email, role, created_at FROM users WHERE id = $1 LIMIT 1`;
+  const sql = `SELECT id, email, role, created_at, line_user_id FROM users WHERE id = $1 LIMIT 1`;
   const result = await query(sql, [id]);
   return result.rows[0] || null;
 };
@@ -117,5 +117,22 @@ export const updatePassword = async (userId, passwordHash) => {
     WHERE id = $2
   `;
   await query(sql, [passwordHash, userId]);
+};
+
+export const getUsersWithLineId = async () => {
+  const sql = `SELECT id, email, first_name, last_name, line_user_id FROM users WHERE line_user_id IS NOT NULL`;
+  const result = await query(sql);
+  return result.rows;
+};
+
+export const updateUserCurrentLocation = async (userId, currentLat, currentLon) => {
+  const sql = `
+    UPDATE user_profiles 
+    SET current_lat = $2, current_lon = $3, updated_at = NOW()
+    WHERE user_id = $1
+    RETURNING *
+  `;
+  const result = await query(sql, [userId, currentLat, currentLon]);
+  return result.rows[0] || null;
 };
 
