@@ -126,12 +126,23 @@ export const getUsersWithLineId = async () => {
 
 export const getUserProfileWithLocation = async (userId) => {
   const sql = `
-    SELECT up.lat, up.lon, up.current_lat, up.current_lon, up.skills, up.available_hours, up.household
+    SELECT up.lat, up.lon, up.current_lat, up.current_lon, up.skills, up.household
     FROM user_profiles up
     WHERE up.user_id = $1
     LIMIT 1
   `;
   const result = await query(sql, [userId]);
+  return result.rows[0] || null;
+};
+
+export const updateUserCurrentLocation = async (userId, currentLat, currentLon) => {
+  const sql = `
+    UPDATE user_profiles 
+    SET current_lat = $2, current_lon = $3, updated_at = NOW()
+    WHERE user_id = $1
+    RETURNING *
+  `;
+  const result = await query(sql, [userId, currentLat, currentLon]);
   return result.rows[0] || null;
 };
 
