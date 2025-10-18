@@ -35,16 +35,15 @@ export const findUserById = async (id) => {
 
 //insert to user's profile 
 
-export const createUserProfile = async ({ user_id, lat, lon,skills,available_hours, household }) => {
+export const createUserProfile = async ({ user_id, lat, lon,skills, household }) => {
   const sql = `
-    INSERT INTO user_profiles(user_id, lat, lon,available_hours,skills, household)
-    VALUES ($1, $2, $3, $4,$5,$6)
+    INSERT INTO user_profiles(user_id, lat, lon,skills, household)
+    VALUES ($1, $2, $3, $4,$5)
     RETURNING *
   `;
   const result = await query(sql, [user_id,
     lat,
     lon,
-    JSON.stringify(available_hours),
     JSON.stringify(skills),    
     household                  
   ]);
@@ -123,6 +122,17 @@ export const getUsersWithLineId = async () => {
   const sql = `SELECT id, email, first_name, last_name, line_user_id FROM users WHERE line_user_id IS NOT NULL`;
   const result = await query(sql);
   return result.rows;
+};
+
+export const getUserProfileWithLocation = async (userId) => {
+  const sql = `
+    SELECT up.lat, up.lon, up.current_lat, up.current_lon, up.skills, up.household
+    FROM user_profiles up
+    WHERE up.user_id = $1
+    LIMIT 1
+  `;
+  const result = await query(sql, [userId]);
+  return result.rows[0] || null;
 };
 
 export const updateUserCurrentLocation = async (userId, currentLat, currentLon) => {

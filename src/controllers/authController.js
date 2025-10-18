@@ -14,7 +14,7 @@ const SALT_ROUNDS = 10;
 
 export const register = async (req, res) => {
   try {
-    const { first_name, last_name, email,phone,password, lat, lon, national_id ,skills,available_hours,embedding,dob} = req.body;
+    const { first_name, last_name, email,phone,password, lat, lon, national_id ,skills,embedding,dob} = req.body;
 //validate
       if (!email || !password || !first_name || !last_name || lat == null || lon == null || !national_id) {
       return res.status(400).json({ message: 'All fields including national_id and location are required' });
@@ -59,7 +59,6 @@ export const register = async (req, res) => {
             lon,
             household,
             skills,
-            available_hours,
             embedding
 
         });
