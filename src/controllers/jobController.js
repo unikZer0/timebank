@@ -12,7 +12,7 @@ import { getUserProfileWithLocation } from '../db/queries/users.js';
 export const createJob = async (req, res) => {
     try {
         const userId = req.userId;
-        const { title, description, required_skills, location_lat, location_lon, time_balance_hours } = req.body;
+        const { title, description, required_skills, time_balance_hours } = req.body;
         if (!title || !description || !time_balance_hours) {
             return res.status(400).json({ 
                 success: false, 

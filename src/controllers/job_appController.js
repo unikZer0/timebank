@@ -1,4 +1,6 @@
 import { createJobAppQuery,getJobAppsByUserQuery,updateJobAppStatusQuery } from '../db/queries/job_app.js';
+import { sendJobApplicationNotification } from '../services/lineService.js';
+import { query } from '../db/prosgresql.js';
 
 export const postJobApp = async (req, res) => {
     try {
@@ -8,6 +10,39 @@ export const postJobApp = async (req, res) => {
         const userId = userIdFromToken || userIdFromBody;
 
         const result = await createJobAppQuery({ userId, jobId });
+
+        // Send LINE notification to job poster
+        try {
+            // Get job details and job poster's LINE user ID
+            const jobQuery = `
+                SELECT j.*, u.line_user_id, u.first_name, u.last_name
+                FROM jobs j
+                JOIN users u ON j.creator_user_id = u.id
+                WHERE j.id = $1
+            `;
+            const jobResult = await query(jobQuery, [jobId]);
+            
+            // Get applicant details
+            const applicantQuery = `
+                SELECT u.first_name, u.last_name
+                FROM users u
+                WHERE u.id = $1
+            `;
+            const applicantResult = await query(applicantQuery, [userId]);
+            
+            if (jobResult.rows.length > 0 && applicantResult.rows.length > 0) {
+                const jobData = jobResult.rows[0];
+                const applicantData = applicantResult.rows[0];
+                
+                // Send LINE notification if job poster has LINE user ID
+                if (jobData.line_user_id) {
+                    await sendJobApplicationNotification(jobData.line_user_id, jobData, applicantData);
+                }
+            }
+        } catch (notificationError) {
+            console.error('Error sending LINE notification:', notificationError);
+            // Don't fail the application if notification fails
+        }
 
         res.json({
             success: true,

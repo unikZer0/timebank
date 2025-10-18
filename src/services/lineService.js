@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import { calculateDistance, formatDistance, getLocationDescription } from '../utils/locationUtils.js';
+import { query } from '../db/prosgresql.js';
 dotenv.config();
 
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -11,7 +13,7 @@ const LINE_API_BASE = 'https://api.line.me/v2';
 const LINE_MESSAGING_API = `${LINE_API_BASE}/bot/message`;
 
 /**
- * Send LINE notification to user
+ * Send LINE notification to user with location information
  * @param {string} userId - LINE user ID
  * @param {Object} jobData - Job information
  * @param {Object} matchData - Admin match data
@@ -31,6 +33,50 @@ export const sendJobMatchNotification = async (userId, jobData, matchData) => {
     if (!userId || typeof userId !== 'string') {
       console.error('Invalid user ID type or empty');
       return false;
+    }
+
+    // Get location information for both job poster and provider
+    let locationInfo = '';
+    try {
+      // Get job poster's location
+      const jobPosterQuery = `
+        SELECT up.lat, up.lon, up.current_lat, up.current_lon, u.first_name, u.last_name
+        FROM user_profiles up
+        JOIN users u ON up.user_id = u.id
+        WHERE u.id = $1
+      `;
+      const jobPosterResult = await query(jobPosterQuery, [jobData.creator_user_id]);
+      
+      // Get provider's location
+      const providerQuery = `
+        SELECT up.lat, up.lon, up.current_lat, up.current_lon, u.first_name, u.last_name
+        FROM user_profiles up
+        JOIN users u ON up.user_id = u.id
+        WHERE u.id = $1
+      `;
+      const providerResult = await query(providerQuery, [matchData.provider_user_id]);
+      
+      if (jobPosterResult.rows.length > 0 && providerResult.rows.length > 0) {
+        const jobPoster = jobPosterResult.rows[0];
+        const provider = providerResult.rows[0];
+        
+        // Use current location if available, otherwise use profile location
+        const jobPosterLat = jobPoster.current_lat || jobPoster.lat;
+        const jobPosterLon = jobPoster.current_lon || jobPoster.lon;
+        const providerLat = provider.current_lat || provider.lat;
+        const providerLon = provider.current_lon || provider.lon;
+        
+        if (jobPosterLat && jobPosterLon && providerLat && providerLon) {
+          const distance = calculateDistance(jobPosterLat, jobPosterLon, providerLat, providerLon);
+          const distanceText = formatDistance(distance);
+          const locationDesc = getLocationDescription(distance);
+          
+          locationInfo = `\n สถานที่: ${locationDesc} (ห่าง ${distanceText})\n งานโดย: ${jobPoster.first_name} ${jobPoster.last_name}`;
+        }
+      }
+    } catch (locationError) {
+      console.error('Error getting location information:', locationError);
+      // Continue without location info
     }
 
     // Try to get user profile first to validate the user ID
@@ -62,19 +108,50 @@ export const sendJobMatchNotification = async (userId, jobData, matchData) => {
       console.log(' Proceeding with message sending despite profile check failure...');
     }
 
-    // First try a simple text message to test if the API works
-    const simpleMessage = {
-      to: [userId],
-      messages: [
-        {
-          type: 'text',
-          text: `New Job Match!\n\nJob: ${jobData.title}\nReward: ${jobData.time_balance_hours} hours\n\nClick the button below to view details!`
+    // Create message with location information and map button
+    const messageText = ` มีงานใหม่ที่ตรงกับคุณ!
+
+ งาน: ${jobData.title}
+ รางวัล: ${jobData.time_balance_hours} ชั่วโมง${locationInfo}
+
+คลิกปุ่มด้านล่างเพื่อดูรายละเอียด!`;
+
+    // Create messages array with text and location button
+    const messages = [
+      {
+        type: 'text',
+        text: messageText
+      }
+    ];
+
+    // Add location button if job has location coordinates
+    if (jobData.location_lat && jobData.location_lon) {
+      const mapUrl = `https://www.google.com/maps?q=${jobData.location_lat},${jobData.location_lon}`;
+      
+      messages.push({
+        type: 'template',
+        altText: 'ดูตำแหน่งงานบนแผนที่',
+        template: {
+          type: 'buttons',
+          text: '📍 ดูตำแหน่งงานบนแผนที่',
+          actions: [
+            {
+              type: 'uri',
+              label: '🗺️ เปิดแผนที่',
+              uri: mapUrl
+            }
+          ]
         }
-      ]
+      });
+    }
+
+    const message = {
+      to: [userId],
+      messages: messages
     };
 
-    console.log('Sending simple LINE message to user:', userId);
-    console.log('Simple message payload:', JSON.stringify(simpleMessage, null, 2));
+    console.log('Sending LINE message with location info to user:', userId);
+    console.log('Message payload:', JSON.stringify(message, null, 2));
     console.log('Using LINE API endpoint:', `${LINE_MESSAGING_API}/multicast`);
 
     const response = await fetch(`${LINE_MESSAGING_API}/multicast`, {
@@ -83,7 +160,7 @@ export const sendJobMatchNotification = async (userId, jobData, matchData) => {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
       },
-      body: JSON.stringify(simpleMessage)
+      body: JSON.stringify(message)
     });
 
     if (response.ok) {
@@ -118,6 +195,132 @@ export const sendJobMatchNotification = async (userId, jobData, matchData) => {
 
   } catch (error) {
     console.error('Error sending LINE notification:', error);
+    return false;
+  }
+};
+
+/**
+ * Send LINE notification to job poster when someone applies
+ * @param {string} userId - LINE user ID of job poster
+ * @param {Object} jobData - Job information
+ * @param {Object} applicantData - Applicant information
+ */
+export const sendJobApplicationNotification = async (userId, jobData, applicantData) => {
+  try {
+    if (!LINE_CHANNEL_ACCESS_TOKEN) {
+      console.error('LINE_CHANNEL_ACCESS_TOKEN not configured');
+      return false;
+    }
+
+    if (!userId || typeof userId !== 'string') {
+      console.error('Invalid user ID for LINE message');
+      return false;
+    }
+
+    // Get location information
+    let locationInfo = '';
+    try {
+      // Get job poster's location
+      const jobPosterQuery = `
+        SELECT up.lat, up.lon, up.current_lat, up.current_lon
+        FROM user_profiles up
+        WHERE up.user_id = $1
+      `;
+      const jobPosterResult = await query(jobPosterQuery, [jobData.creator_user_id]);
+      
+      // Get applicant's location
+      const applicantQuery = `
+        SELECT up.lat, up.lon, up.current_lat, up.current_lon
+        FROM user_profiles up
+        WHERE up.user_id = $1
+      `;
+      const applicantResult = await query(applicantQuery, [applicantData.id]);
+      
+      if (jobPosterResult.rows.length > 0 && applicantResult.rows.length > 0) {
+        const jobPoster = jobPosterResult.rows[0];
+        const applicant = applicantResult.rows[0];
+        
+        // Use current location if available, otherwise use profile location
+        const jobPosterLat = jobPoster.current_lat || jobPoster.lat;
+        const jobPosterLon = jobPoster.current_lon || jobPoster.lon;
+        const applicantLat = applicant.current_lat || applicant.lat;
+        const applicantLon = applicant.current_lon || applicant.lon;
+        
+        if (jobPosterLat && jobPosterLon && applicantLat && applicantLon) {
+          const distance = calculateDistance(jobPosterLat, jobPosterLon, applicantLat, applicantLon);
+          const distanceText = formatDistance(distance);
+          const locationDesc = getLocationDescription(distance);
+          
+          locationInfo = `\n สถานที่: ${locationDesc} (ห่าง ${distanceText})`;
+        }
+      }
+    } catch (locationError) {
+      console.error('Error getting location information:', locationError);
+    }
+
+    const messageText = ` มีผู้สมัครงานใหม่!
+
+ งาน: ${jobData.title}
+ ผู้สมัคร: ${applicantData.first_name} ${applicantData.last_name}${locationInfo}
+
+ตรวจสอบแดชบอร์ดเพื่อดูการสมัคร!`;
+
+    // Create messages array with text and location button
+    const messages = [
+      {
+        type: 'text',
+        text: messageText
+      }
+    ];
+
+    // Add location button if job has location coordinates
+    if (jobData.location_lat && jobData.location_lon) {
+      const mapUrl = `https://www.google.com/maps?q=${jobData.location_lat},${jobData.location_lon}`;
+      
+      messages.push({
+        type: 'template',
+        altText: 'ดูตำแหน่งงานบนแผนที่',
+        template: {
+          type: 'buttons',
+          text: '📍 ดูตำแหน่งงานบนแผนที่',
+          actions: [
+            {
+              type: 'uri',
+              label: '🗺️ เปิดแผนที่',
+              uri: mapUrl
+            }
+          ]
+        }
+      });
+    }
+
+    const payload = {
+      to: userId,
+      messages: messages
+    };
+
+    console.log('Sending job application notification to user:', userId);
+
+    const response = await fetch(`${LINE_MESSAGING_API}/push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      console.log(`Job application notification sent successfully to user ${userId}`);
+      return true;
+    } else {
+      const error = await response.text();
+      console.error('Failed to send job application notification:', error);
+      return false;
+    }
+
+  } catch (error) {
+    console.error('Error sending job application notification:', error);
     return false;
   }
 };
@@ -267,10 +470,10 @@ export const handleLineWebhook = async (event) => {
           
         default:
           console.log('Unknown postback action:', action);
-          return {
-            type: 'reply',
-            message: 'Unknown action. Please try again.'
-          };
+      return {
+        type: 'reply',
+        message: 'การดำเนินการไม่รู้จัก กรุณาลองใหม่อีกครั้ง'
+      };
       }
     }
     
@@ -284,7 +487,7 @@ export const handleLineWebhook = async (event) => {
       // You can add more sophisticated message handling here
       return {
         type: 'reply',
-        message: 'Thank you for your message! Please use the rich menu to interact with job matches.'
+        message: 'ขอบคุณสำหรับข้อความของคุณ! กรุณาใช้เมนูเพื่อโต้ตอบกับงานที่ตรงกัน'
       };
     }
     

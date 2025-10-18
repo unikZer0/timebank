@@ -86,7 +86,8 @@ export const createAdminMatch = async (req, res) => {
             
             const matchData = {
                 id: newMatch.id,
-                reason: reason
+                reason: reason,
+                provider_user_id: user_id  // Add the provider user ID
             };
             
             const lineSent = await sendJobMatchNotification(user.line_user_id, job, matchData);
