@@ -7,13 +7,12 @@ import {
     deleteJobQuery, 
     broadcastJobQuery, 
 } from '../db/queries/jobs.js';
+import { getUserProfileWithLocation } from '../db/queries/users.js';
 
 export const createJob = async (req, res) => {
     try {
         const userId = req.userId;
         const { title, description, required_skills, location_lat, location_lon, time_balance_hours } = req.body;
-
-        // Validate required fields
         if (!title || !description || !time_balance_hours) {
             return res.status(400).json({ 
                 success: false, 
@@ -21,20 +20,33 @@ export const createJob = async (req, res) => {
             });
         }
 
-        // Validate time_balance_hours is positive
         if (parseFloat(time_balance_hours) <= 0) {
             return res.status(400).json({ 
                 success: false, 
                 error: 'Time balance hours must be positive' 
             });
         }
+        const userProfile = await getUserProfileWithLocation(userId);
+        let finalLat, finalLon;
+        
+        if (location_lat && location_lon) {
+            finalLat = parseFloat(location_lat);
+            finalLon = parseFloat(location_lon);
+        } else if (userProfile) {
+
+            finalLat = userProfile.current_lat || userProfile.lat;
+            finalLon = userProfile.current_lon || userProfile.lon;
+        } else {
+            finalLat = null;
+            finalLon = null;
+        }
 
         const jobData = {
             title,
             description,
             required_skills: required_skills || [],
-            location_lat: parseFloat(location_lat) || null,
-            location_lon: parseFloat(location_lon) || null,
+            location_lat: finalLat,
+            location_lon: finalLon,
             time_balance_hours: parseFloat(time_balance_hours),
             creator_user_id: userId
         };
@@ -131,12 +143,32 @@ export const updateJob = async (req, res) => {
         const userId = req.userId;
         const { title, description, required_skills, location_lat, location_lon, time_balance_hours } = req.body;
 
+        // Get user's profile to access location data
+        const userProfile = await getUserProfileWithLocation(userId);
+        
+        // Determine location to use: current location if available, otherwise profile location
+        let finalLat, finalLon;
+        
+        if (location_lat && location_lon) {
+            // Use provided location coordinates
+            finalLat = parseFloat(location_lat);
+            finalLon = parseFloat(location_lon);
+        } else if (userProfile) {
+            // Use current location if available, otherwise fall back to profile location
+            finalLat = userProfile.current_lat || userProfile.lat;
+            finalLon = userProfile.current_lon || userProfile.lon;
+        } else {
+            // No location data available
+            finalLat = null;
+            finalLon = null;
+        }
+
         const updateData = {
             title,
             description,
             required_skills,
-            location_lat: location_lat ? parseFloat(location_lat) : null,
-            location_lon: location_lon ? parseFloat(location_lon) : null,
+            location_lat: finalLat,
+            location_lon: finalLon,
             time_balance_hours: time_balance_hours ? parseFloat(time_balance_hours) : null
         };
 
