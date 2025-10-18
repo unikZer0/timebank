@@ -6,7 +6,9 @@ import {
   forgotPassword,
   resetPassword,
   logout,
-  updateCurrentLocation
+  updateCurrentLocation,
+  getAllSkills,
+  searchUserByIdCard
 } from "../controllers/authController.js";
 import { autoLogin } from "../controllers/authController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
@@ -21,6 +23,8 @@ router.post("/reset-password", resetPassword);
 router.post("/logout", authMiddleware, logout);
 router.get("/auto-login", autoLoginMiddleware, autoLogin);
 router.put("/update-location", authMiddleware, updateCurrentLocation);
+router.get("/skills", authMiddleware, getAllSkills);
+router.get("/search-by-id-card", authMiddleware, searchUserByIdCard);
 
 
 // //====================== Example admin-only route

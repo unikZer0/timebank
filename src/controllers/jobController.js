@@ -12,7 +12,8 @@ import { getUserProfileWithLocation } from '../db/queries/users.js';
 export const createJob = async (req, res) => {
     try {
         const userId = req.userId;
-        const { title, description, required_skills, time_balance_hours } = req.body;
+        const { title, description, required_skills, time_balance_hours, start_time, end_time, location_lat, location_lon } = req.body;
+        
         if (!title || !description || !time_balance_hours) {
             return res.status(400).json({ 
                 success: false, 
@@ -26,6 +27,20 @@ export const createJob = async (req, res) => {
                 error: 'Time balance hours must be positive' 
             });
         }
+
+        // Validate start_time and end_time if provided
+        if (start_time && end_time) {
+            const startDate = new Date(start_time);
+            const endDate = new Date(end_time);
+            
+            if (startDate >= endDate) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'Start time must be before end time' 
+                });
+            }
+        }
+
         const userProfile = await getUserProfileWithLocation(userId);
         let finalLat, finalLon;
         
@@ -33,7 +48,6 @@ export const createJob = async (req, res) => {
             finalLat = parseFloat(location_lat);
             finalLon = parseFloat(location_lon);
         } else if (userProfile) {
-
             finalLat = userProfile.current_lat || userProfile.lat;
             finalLon = userProfile.current_lon || userProfile.lon;
         } else {
@@ -48,6 +62,8 @@ export const createJob = async (req, res) => {
             location_lat: finalLat,
             location_lon: finalLon,
             time_balance_hours: parseFloat(time_balance_hours),
+            start_time: start_time || null,
+            end_time: end_time || null,
             creator_user_id: userId
         };
 
@@ -141,7 +157,20 @@ export const updateJob = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.userId;
-        const { title, description, required_skills, location_lat, location_lon, time_balance_hours } = req.body;
+        const { title, description, required_skills, location_lat, location_lon, time_balance_hours, start_time, end_time } = req.body;
+
+        // Validate start_time and end_time if provided
+        if (start_time && end_time) {
+            const startDate = new Date(start_time);
+            const endDate = new Date(end_time);
+            
+            if (startDate >= endDate) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'Start time must be before end time' 
+                });
+            }
+        }
 
         // Get user's profile to access location data
         const userProfile = await getUserProfileWithLocation(userId);
@@ -169,7 +198,9 @@ export const updateJob = async (req, res) => {
             required_skills,
             location_lat: finalLat,
             location_lon: finalLon,
-            time_balance_hours: time_balance_hours ? parseFloat(time_balance_hours) : null
+            time_balance_hours: time_balance_hours ? parseFloat(time_balance_hours) : null,
+            start_time: start_time || null,
+            end_time: end_time || null
         };
 
         const updatedJob = await updateJobQuery(id, userId, updateData);

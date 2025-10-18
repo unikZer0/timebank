@@ -108,11 +108,31 @@ export const sendJobMatchNotification = async (userId, jobData, matchData) => {
       console.log(' Proceeding with message sending despite profile check failure...');
     }
 
+    // Format time range if available
+    let timeInfo = '';
+    if (jobData.start_time && jobData.end_time) {
+      const formatTime = (timeString) => {
+        const [hours, minutes] = timeString.split(':');
+        const hour = parseInt(hours);
+        const minute = parseInt(minutes);
+        const period = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+        return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+      };
+      
+      const startTime = formatTime(jobData.start_time);
+      const endTime = formatTime(jobData.end_time);
+      timeInfo = `\n เวลา: ${startTime} - ${endTime}`;
+    }
+
     // Create message with location information and map button
     const messageText = ` มีงานใหม่ที่ตรงกับคุณ!
 
  งาน: ${jobData.title}
- รางวัล: ${jobData.time_balance_hours} ชั่วโมง${locationInfo}
+ รางวัล: ${jobData.time_balance_hours} ชั่วโมง${timeInfo}${locationInfo}
+
+ รายละเอียดงาน:
+ ${jobData.description}
 
 คลิกปุ่มด้านล่างเพื่อดูรายละเอียด!`;
 
@@ -461,8 +481,17 @@ export const handleLineWebhook = async (event) => {
       
       switch (action) {
         case 'confirm_job':
-          // For static menu, we'll redirect to a general confirm page
-          // The match_id will be handled by the frontend based on user's active match
+          // Send confirmation message first
+          await sendLineMessage(userId, `✅ คุณได้ยืนยันการสมัครงานแล้ว!
+
+ระบบจะแจ้งให้คุณทราบเมื่อมีการอัปเดตสถานะงาน
+
+คุณสามารถตรวจสอบสถานะงานได้ที่:
+${FRONTEND_URL}/my-jobs
+
+ขอบคุณที่ใช้บริการ TimeBank!`);
+          
+          // Then redirect to job confirmation page
           return {
             type: 'redirect',
             url: `${FRONTEND_URL}/job-confirm`
@@ -561,6 +590,73 @@ export const handleLineLoginCallback = async (code, state) => {
   } catch (error) {
     console.error('Error handling LINE login callback:', error);
     throw error;
+  }
+};
+
+/**
+ * Send thank you message to user who completed work
+ * @param {string} userId - LINE user ID of the worker
+ * @param {Object} jobData - Job information
+ * @param {Object} requesterData - Job requester information
+ */
+export const sendJobCompletionThankYou = async (userId, jobData, requesterData) => {
+  try {
+    if (!LINE_CHANNEL_ACCESS_TOKEN) {
+      console.error('LINE_CHANNEL_ACCESS_TOKEN not configured');
+      return false;
+    }
+
+    if (!userId || typeof userId !== 'string') {
+      console.error('Invalid user ID for LINE thank you message');
+      return false;
+    }
+
+    // Create thank you message
+    const messageText = `🎉 ขอบคุณสำหรับการทำงาน!
+
+งาน: ${jobData.title}
+รางวัล: ${jobData.time_balance_hours} ชั่วโมง
+ผู้จ้าง: ${requesterData.first_name} ${requesterData.last_name}
+
+คุณได้รับเครดิต ${jobData.time_balance_hours} ชั่วโมงเข้าบัญชีแล้ว! 
+
+ขอบคุณที่ช่วยเหลือชุมชนของเรา `;
+
+    const message = {
+      to: [userId],
+      messages: [
+        {
+          type: 'text',
+          text: messageText
+        }
+      ]
+    };
+
+    console.log('Sending thank you message to user:', userId);
+    console.log('Message payload:', JSON.stringify(message, null, 2));
+
+    const response = await fetch(`${LINE_MESSAGING_API}/multicast`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
+      },
+      body: JSON.stringify(message)
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('Thank you message sent successfully:', result);
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.error('Failed to send thank you message:', response.status, errorText);
+      return false;
+    }
+
+  } catch (error) {
+    console.error('Error sending thank you message:', error);
+    return false;
   }
 };
 

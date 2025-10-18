@@ -16,10 +16,33 @@ export const findUserByEmail = async (email) => {
   const result = await query(sql, [email]);
   return result.rows[0] || null;
 };
-export const findUserNationalId = async (national_id) => {
-  const sql = `SELECT id, verified FROM users WHERE national_id=$1 LIMIT 1`;
-  const result = await query(sql, [national_id]);
-  return result.rows[0] || null;
+export const searchUsersByNameOrId = async (searchTerm) => {
+  const sql = `
+    SELECT 
+      u.id,
+      u.first_name,
+      u.last_name,
+      u.email,
+      u.national_id,
+      u.status,
+      up.household
+    FROM users u
+    LEFT JOIN user_profiles up ON u.id = up.user_id
+    WHERE u.status = 'verified'
+    AND (
+      u.national_id = $1 
+      OR CONCAT(u.first_name, ' ', u.last_name) ILIKE $2
+      OR u.first_name ILIKE $2
+      OR u.last_name ILIKE $2
+    )
+    ORDER BY 
+      CASE WHEN u.national_id = $1 THEN 1 ELSE 2 END,
+      u.first_name, u.last_name
+    LIMIT 10
+  `;
+  const searchPattern = `%${searchTerm}%`;
+  const result = await query(sql, [searchTerm, searchPattern]);
+  return result.rows;
 };
 export const findUserPhone  = async (phone) => {
   const sql = `SELECT id FROM users WHERE phone=$1 LIMIT 1`;
@@ -144,5 +167,19 @@ export const updateUserCurrentLocation = async (userId, currentLat, currentLon) 
   `;
   const result = await query(sql, [userId, currentLat, currentLon]);
   return result.rows[0] || null;
+};
+
+/**
+ * Get all unique skills from all user profiles
+ */
+export const getAllUserSkills = async () => {
+  const sql = `
+    SELECT DISTINCT jsonb_array_elements_text(skills) as skill
+    FROM user_profiles 
+    WHERE skills IS NOT NULL AND jsonb_typeof(skills) = 'array'
+    ORDER BY skill
+  `;
+  const result = await query(sql);
+  return result.rows.map(row => row.skill);
 };
 
