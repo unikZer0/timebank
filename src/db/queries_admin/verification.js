@@ -16,7 +16,7 @@ export const getUnverifiedUsersQuery = async () => {
 export const getUserDetailsQuery = async (userId) => {
     const sql = `
         SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.national_id, u.dob, u.created_at,
-               up.lat, up.lon, up.skills, up.household
+               up.lat, up.lon, up.skills, up.household,u.status
         FROM users u
         LEFT JOIN user_profiles up ON u.id = up.user_id
         WHERE u.id = $1
