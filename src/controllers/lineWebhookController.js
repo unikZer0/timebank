@@ -36,13 +36,13 @@ export const handleLineWebhookEndpoint = async (req, res) => {
           const existing = await query("SELECT id, email FROM users WHERE line_user_id=$1", [lineUserId]);
           if (existing.rows.length > 0) {
             console.log('Already linked user:', existing.rows[0].email);
-            await sendLineMessage(lineUserId, " Welcome back! Your LINE account is already linked to your TimeBank profile.");
+            await sendLineMessage(lineUserId, " ยินดีต้อนรับกลับ! บัญชี LINE ของคุณเชื่อมต่อกับโปรไฟล์ TimeBank แล้ว");
             continue;
           }
 
           // If not linked, send welcome message asking to link
           const linkUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/link-line`;
-          await sendLineMessage(lineUserId, ` Welcome to TimeBank!\n\nTo receive job notifications, please link your account:\n\n${linkUrl}\n\nOr send a message like: "link: your@email.com"`);
+          await sendLineMessage(lineUserId, ` ยินดีต้อนรับสู่ TimeBank!\n\nเพื่อรับการแจ้งเตือนงาน กรุณาเชื่อมต่อบัญชีของคุณ:\n\n${linkUrl}\n\nหรือส่งข้อความเช่น: "link: your@email.com"`);
         } catch (error) {
           console.error('Error handling follow event:', error);
         }
@@ -54,28 +54,28 @@ export const handleLineWebhookEndpoint = async (req, res) => {
         const lineUserId = event.source.userId;
 
         if (!email) {
-          await sendLineMessage(lineUserId, " Please provide a valid email. Format: link: your@email.com");
+          await sendLineMessage(lineUserId, " กรุณาระบุอีเมลที่ถูกต้อง รูปแบบ: link: your@email.com");
           continue;
         }
 
         try {
           const user = await query("SELECT id, email FROM users WHERE email=$1", [email]);
           if (user.rows.length === 0) {
-            await sendLineMessage(lineUserId, " No user found with that email. Please register first at our website.");
+            await sendLineMessage(lineUserId, " ไม่พบผู้ใช้ที่มีอีเมลนี้ กรุณาสมัครสมาชิกที่เว็บไซต์ของเราก่อน");
           } else {
             // Check if email is already linked to another LINE account
             const existingLink = await query("SELECT line_user_id FROM users WHERE email=$1 AND line_user_id IS NOT NULL", [email]);
             if (existingLink.rows.length > 0 && existingLink.rows[0].line_user_id !== lineUserId) {
-              await sendLineMessage(lineUserId, " This email is already linked to another LINE account.");
+              await sendLineMessage(lineUserId, " อีเมลนี้เชื่อมต่อกับบัญชี LINE อื่นแล้ว");
             } else {
               // Link the account
               await query("UPDATE users SET line_user_id=$1 WHERE email=$2", [lineUserId, email]);
-              await sendLineMessage(lineUserId, " Your LINE account is now linked to your TimeBank profile! You'll receive job notifications here.");
+              await sendLineMessage(lineUserId, " บัญชี LINE ของคุณเชื่อมต่อกับโปรไฟล์ TimeBank แล้ว! คุณจะได้รับการแจ้งเตือนงานที่นี่");
             }
           }
         } catch (error) {
           console.error('Error handling link message:', error);
-          await sendLineMessage(lineUserId, " An error occurred. Please try again later.");
+          await sendLineMessage(lineUserId, " เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
         }
       }
       

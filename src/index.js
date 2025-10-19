@@ -5,7 +5,9 @@ import cookieParser from 'cookie-parser';
 import authRouter from './routes/authRoutes.js'
 import verificationRouter from './routes_admin/verificationRoutes.js'
 import transferRouter from './routes/transferRoutes.js'
+import transactionRouter from './routes/transactionRoutes.js'
 import notificationRouter from './routes/notificationRoutes.js'
+import userProfileRouter from './routes/userProfileRoutes.js'
 import { rememberMeMiddleware } from "./middlewares/rememberMeMiddleware.js";
 import jobAppRouter from './routes/job_appRoutes.js';
 import jobRouter from './routes/jobRoutes.js';
@@ -38,6 +40,9 @@ app.use('/api/auth', authRouter);
 //=======transfer routes
 app.use('/api', transferRouter);
 
+//transaction routes
+app.use('/api', transactionRouter);
+
 //job app routes
 app.use('/api', jobAppRouter);
 
@@ -46,6 +51,9 @@ app.use('/api', jobRouter);
 
 //notification routes
 app.use('/api/notifications', notificationRouter);
+
+//user profile routes
+app.use('/api', userProfileRouter);
 
 //LINE webhook and job match routes
 app.use('/api', lineRouter);

@@ -57,7 +57,34 @@ export const getJobAppsByUserQuery = async (userId) => {
         WHERE ja.user_id = $1
         ORDER BY ja.applied_at DESC`
     const jobapp= await query(sql,[userId]);
-    return jobapp.rows[0] || null;
+    return jobapp.rows; // Return all rows, not just the first one
+};
+
+// Get applications for a specific job (for job creator)
+export const getJobApplicationsByJobIdQuery = async (jobId, creatorUserId) => {
+    const sql = `
+        SELECT 
+            ja.id,
+            ja.user_id,
+            ja.status,
+            ja.applied_at,
+            u.first_name,
+            u.last_name,
+            u.email,
+            up.skills,
+            up.lat,
+            up.lon,
+            up.current_lat,
+            up.current_lon
+        FROM job_applications ja
+        JOIN users u ON ja.user_id = u.id
+        LEFT JOIN user_profiles up ON u.id = up.user_id
+        JOIN jobs j ON ja.job_id = j.id
+        WHERE ja.job_id = $1 AND j.creator_user_id = $2
+        ORDER BY ja.applied_at DESC
+    `;
+    const result = await query(sql, [jobId, creatorUserId]);
+    return result.rows;
 };
 export const updateJobAppStatusQuery = async (id, status, employerId) => {
     const sql = `SELECT ja.id, ja.user_id, j.time_balance_hours, j.creator_user_id
@@ -97,15 +124,67 @@ const transferJobHoursToWallet = async (workerId, hours, applicationId) => {
         // Update worker's wallet
         await query('UPDATE wallets SET balance = $1 WHERE user_id = $2', [newBalance, workerId]);
         
-        // Create transfer record
+        // Get requester user ID for transaction record
+        const requesterQuery = `
+            SELECT j.creator_user_id
+            FROM job_applications ja
+            JOIN jobs j ON ja.job_id = j.id
+            WHERE ja.id = $1
+        `;
+        const requesterResult = await query(requesterQuery, [applicationId]);
+        const requesterUserId = requesterResult.rows[0]?.creator_user_id;
+        
+        // Create transfer record with requester as from_user_id
         await query(
             'INSERT INTO transactions (from_user_id, to_user_id, amount, type, created_at) VALUES ($1, $2, $3, $4, NOW())',
-            [null, workerId, hours, 'job_completion']
+            [requesterUserId, workerId, hours, 'job_completion']
         );
+        
+        // Send thank you message via LINE
+        try {
+            // Get job and worker data for thank you message
+            const jobDataQuery = `
+                SELECT j.title, j.time_balance_hours, j.description, 
+                       requester.first_name as requester_first_name, 
+                       requester.last_name as requester_last_name,
+                       worker.line_user_id as worker_line_user_id
+                FROM job_applications ja
+                JOIN jobs j ON ja.job_id = j.id
+                JOIN users requester ON j.creator_user_id = requester.id
+                JOIN users worker ON ja.user_id = worker.id
+                WHERE ja.id = $1
+            `;
+            const jobDataResult = await query(jobDataQuery, [applicationId]);
+            
+            if (jobDataResult.rows.length > 0) {
+                const jobData = jobDataResult.rows[0];
+                const requesterData = {
+                    first_name: jobData.requester_first_name,
+                    last_name: jobData.requester_last_name
+                };
+                
+                // Send thank you message to the worker (person who completed the job)
+                if (jobData.worker_line_user_id) {
+                    const { sendJobCompletionThankYou } = await import('../../services/lineService.js');
+                    await sendJobCompletionThankYou(jobData.worker_line_user_id, {
+                        title: jobData.title,
+                        time_balance_hours: jobData.time_balance_hours,
+                        description: jobData.description
+                    }, requesterData);
+                    
+                    console.log(`Thank you message sent to worker ${workerId} for job completion`);
+                } else {
+                    console.log(`Worker ${workerId} has no LINE user ID - thank you message not sent`);
+                }
+            }
+        } catch (thankYouError) {
+            console.error('Error sending thank you message:', thankYouError);
+            // Don't fail the transfer if thank you message fails
+        }
         
         // Queue notification for job completion reward
         try {
-            const { notifyJobCompletionReward } = await import('../queues/notificationQueue.js');
+            const { notifyJobCompletionReward } = await import('../../queues/notificationQueue.js');
             await notifyJobCompletionReward(workerId, hours, `Job Application ${applicationId}`);
             console.log(`Job completion reward notification queued for worker ${workerId}`);
         } catch (notificationError) {

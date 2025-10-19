@@ -1,7 +1,7 @@
 import { getJobApplicantsQuery, getAdminJobsQuery, getJobsForMatchingQuery, createAdminMatchQuery, getAdminMatchesQuery, updateAdminMatchQuery, deleteAdminMatchQuery, updateJobApplicationStatusQuery, getSkilledUsersForJobQuery } from "../db/queries_admin/admin_match.js";
 import { sendJobMatchNotification } from "../services/lineService.js";
 import { findUserById } from "../db/queries/users.js";
-import { getJobByIdQuery } from "../db/queries/jobs.js";
+import { getJobByIdQuery, updateJobBroadcastedStatusQuery } from "../db/queries/jobs.js";
 import { switchToMatchedMenu } from "../services/richMenuService.js";
 
 export const getSkilledUsersForJob = async (req, res) => {
@@ -59,35 +59,45 @@ export const getJobsForMatching = async (req, res) => {
 export const createAdminMatch = async (req, res) => {
     try {
         const { job_id, user_id, reason } = req.body;
+        
+        // Validate that job and user exist BEFORE creating the match
+        const user = await findUserById(user_id);
+        const job = await getJobByIdQuery(job_id);
+        
+        console.log(`Debug - User ${user_id} data:`, user);
+        console.log(`Debug - Job ${job_id} data:`, job);
+        
+        if (!user) {
+            console.log(`User ${user_id} not found in database`);
+            return res.status(404).json({
+                success: false,
+                error: 'User not found',
+                message: `User with ID ${user_id} does not exist`
+            });
+        }
+        
+        if (!job) {
+            console.log(`Job ${job_id} not found in database`);
+            return res.status(404).json({
+                success: false,
+                error: 'Job not found',
+                message: `Job with ID ${job_id} does not exist`
+            });
+        }
+        
+        // Now create the admin match since we know both job and user exist
         const newMatch = await createAdminMatchQuery(job_id, user_id, reason);
     
+        // Automatically set the job as broadcasted when admin creates a match
         try {
-            const user = await findUserById(user_id);
-            const job = await getJobByIdQuery(job_id);
-            
-            console.log(`Debug - User ${user_id} data:`, user);
-            console.log(`Debug - Job ${job_id} data:`, job);
-            
-            if (!user) {
-                console.log(`User ${user_id} not found in database`);
-                return res.status(201).json({
-                    success: true,
-                    match: newMatch,
-                    message: 'Admin match created successfully (user not found)',
-                    warning: 'User not found - LINE notification not sent'
-                });
-            }
-            
-            if (!job) {
-                console.log(`Job ${job_id} not found in database`);
-                return res.status(201).json({
-                    success: true,
-                    match: newMatch,
-                    message: 'Admin match created successfully (job not found)',
-                    warning: 'Job not found - LINE notification not sent'
-                });
-            }
-            
+            await updateJobBroadcastedStatusQuery(job_id, true);
+            console.log(`Job ${job_id} automatically set as broadcasted due to admin match`);
+        } catch (broadcastError) {
+            console.error('Error setting job as broadcasted:', broadcastError);
+            // Don't fail the match creation if broadcast update fails
+        }
+    
+        try {
             console.log(`User ${user_id} line_user_id:`, user.line_user_id);
             
             if (!user.line_user_id) {
@@ -102,7 +112,8 @@ export const createAdminMatch = async (req, res) => {
             
             const matchData = {
                 id: newMatch.id,
-                reason: reason
+                reason: reason,
+                provider_user_id: user_id  
             };
             
             const lineSent = await sendJobMatchNotification(user.line_user_id, job, matchData);
@@ -133,10 +144,20 @@ export const createAdminMatch = async (req, res) => {
         res.status(201).json({
             success: true,
             match: newMatch,
-            message: 'Admin match created successfully'
+            message: 'Admin match created successfully and job broadcasted'
         });
     } catch (error) {
         console.error('Error creating admin match:', error);
+        
+        // Handle specific database errors
+        if (error.code === '23503') {
+            return res.status(400).json({
+                success: false,
+                error: 'Foreign key constraint violation',
+                message: 'The job or user does not exist in the database'
+            });
+        }
+        
         res.status(500).json({ 
             success: false,
             error: 'Internal server error' 

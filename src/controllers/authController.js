@@ -2,7 +2,7 @@ import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
-import { createUser, findUserByEmail,findUserNationalId,findUserPhone,createUserProfile, findUserByIdentifier, updateRememberToken, clearRememberToken, findUserByResetToken, updateResetToken, updatePassword, updateUserCurrentLocation } from "../db/queries/users.js";
+import { createUser, findUserByEmail,searchUsersByNameOrId,findUserPhone,createUserProfile, findUserByIdentifier, updateRememberToken, clearRememberToken, findUserByResetToken, updateResetToken, updatePassword, updateUserCurrentLocation, getAllUserSkills } from "../db/queries/users.js";
 import { createWallet } from "../db/queries/wallets.js";
 import { notifyAdminsNewUser } from "../queues/notificationQueue.js";
 import { handleLineLoginCallback } from "../services/lineService.js";
@@ -393,5 +393,103 @@ export const lineLoginCallback = async (req, res) => {
   } catch (error) {
     console.error('LINE login callback error:', error);
     res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3001'}/link-line?error=server_error`);
+  }
+};
+
+/**
+ * Get all unique skills from user profiles
+ */
+export const getAllSkills = async (req, res) => {
+  try {
+    const skills = await getAllUserSkills();
+    
+    res.status(200).json({
+      success: true,
+      skills: skills
+    });
+  } catch (error) {
+    console.error('Error fetching all skills:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch skills'
+    });
+  }
+};
+
+/**
+ * Search users by name or ID Card number
+ */
+export const searchUserByIdCard = async (req, res) => {
+  try {
+    const { search } = req.query;
+    
+    if (!search || search.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search term is required'
+      });
+    }
+
+    const searchTerm = search.trim();
+    
+    // If it's exactly 13 digits, treat it as ID card search
+    if (searchTerm.length === 13 && /^\d+$/.test(searchTerm)) {
+      const users = await searchUsersByNameOrId(searchTerm);
+      
+      if (users.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      return res.json({
+        success: true,
+        users: users.map(user => ({
+          id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email,
+          national_id: user.national_id,
+          household: user.household
+        }))
+      });
+    }
+    
+    // Otherwise, search by name
+    if (searchTerm.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search term must be at least 2 characters long'
+      });
+    }
+
+    const users = await searchUsersByNameOrId(searchTerm);
+    
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No users found'
+      });
+    }
+
+    res.json({
+      success: true,
+      users: users.map(user => ({
+        id: user.id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        national_id: user.national_id,
+        household: user.household
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
   }
 };

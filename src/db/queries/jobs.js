@@ -1,9 +1,9 @@
 import { query } from "../prosgresql.js";
 
-export const createJobQuery = async ({ title, description, required_skills, location_lat, location_lon, time_balance_hours, creator_user_id }) => {
+export const createJobQuery = async ({ title, description, required_skills, location_lat, location_lon, time_balance_hours, start_time, end_time, creator_user_id }) => {
     const sql = `
-        INSERT INTO jobs (title, description, required_skills, location_lat, location_lon, time_balance_hours, creator_user_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO jobs (title, description, required_skills, location_lat, location_lon, time_balance_hours, start_time, end_time, creator_user_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
     `;
     
@@ -12,7 +12,7 @@ export const createJobQuery = async ({ title, description, required_skills, loca
                       (typeof required_skills === 'string' && required_skills.trim() !== '') ? 
                       required_skills.split(',').map(skill => skill.trim()) : [];
     
-    const result = await query(sql, [title, description, skillsArray, location_lat, location_lon, time_balance_hours, creator_user_id]);
+    const result = await query(sql, [title, description, skillsArray, location_lat, location_lon, time_balance_hours, start_time, end_time, creator_user_id]);
     return result.rows[0];
 };
 
@@ -26,6 +26,8 @@ export const getJobsQuery = async (limit = 50, offset = 0) => {
             j.location_lat,
             j.location_lon,
             j.time_balance_hours,
+            j.start_time,
+            j.end_time,
             j.broadcasted,
             j.created_at,
             u.id as creator_user_id,
@@ -52,6 +54,8 @@ export const getJobByIdQuery = async (jobId) => {
             j.location_lat,
             j.location_lon,
             j.time_balance_hours,
+            j.start_time,
+            j.end_time,
             j.broadcasted,
             j.created_at,
             u.id as creator_user_id,
@@ -76,21 +80,27 @@ export const getJobsByUserQuery = async (userId) => {
             j.location_lat,
             j.location_lon,
             j.time_balance_hours,
+            j.start_time,
+            j.end_time,
             j.broadcasted,
-            j.created_at
+            j.created_at,
+            COUNT(ja.id) as application_count
         FROM jobs j
+        LEFT JOIN job_applications ja ON j.id = ja.job_id
         WHERE j.creator_user_id = $1
+        GROUP BY j.id
         ORDER BY j.created_at DESC
     `;
     const result = await query(sql, [userId]);
     return result.rows;
 };
 
-export const updateJobQuery = async (jobId, userId, { title, description, required_skills, location_lat, location_lon, time_balance_hours }) => {
+export const updateJobQuery = async (jobId, userId, { title, description, required_skills, location_lat, location_lon, time_balance_hours, start_time, end_time }) => {
     const sql = `
         UPDATE jobs 
         SET title = $3, description = $4, required_skills = $5, 
-            location_lat = $6, location_lon = $7, time_balance_hours = $8
+            location_lat = $6, location_lon = $7, time_balance_hours = $8,
+            start_time = $9, end_time = $10
         WHERE id = $1 AND creator_user_id = $2
         RETURNING *
     `;
@@ -98,7 +108,7 @@ export const updateJobQuery = async (jobId, userId, { title, description, requir
                       (typeof required_skills === 'string' && required_skills.trim() !== '') ? 
                       required_skills.split(',').map(skill => skill.trim()) : [];
     
-    const result = await query(sql, [jobId, userId, title, description, skillsArray, location_lat, location_lon, time_balance_hours]);
+    const result = await query(sql, [jobId, userId, title, description, skillsArray, location_lat, location_lon, time_balance_hours, start_time, end_time]);
     return result.rows[0] || null;
 };
 
@@ -120,5 +130,17 @@ export const broadcastJobQuery = async (jobId, userId) => {
         RETURNING *
     `;
     const result = await query(sql, [jobId, userId]);
+    return result.rows[0] || null;
+};
+
+// Update job broadcasted status (for admin use)
+export const updateJobBroadcastedStatusQuery = async (jobId, broadcasted = true) => {
+    const sql = `
+        UPDATE jobs 
+        SET broadcasted = $2
+        WHERE id = $1
+        RETURNING *
+    `;
+    const result = await query(sql, [jobId, broadcasted]);
     return result.rows[0] || null;
 };
