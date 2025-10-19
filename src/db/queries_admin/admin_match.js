@@ -183,27 +183,36 @@ export const getJobsForMatchingQuery = async () => {
 
 export const getSkilledUsersForJobQuery = async (jobId) => {
     const sql = `
+        WITH job_location AS (
+            SELECT location_lat, location_lon, required_skills
+            FROM jobs
+            WHERE id = $1
+        )
         SELECT
-    u.id,
-    u.first_name,
-    u.last_name,
-    u.email,
-    up.skills,
-    up.current_lat,
-    up.current_lon
-FROM
-    user_profiles up
-JOIN
-    users u ON up.user_id = u.id
-WHERE
-    (SELECT array_agg(value::text)
-     FROM jsonb_array_elements(up.skills)) 
-    && 
-    (SELECT array_agg(value::text)
-     FROM jsonb_array_elements(
-         (SELECT to_jsonb(required_skills) FROM jobs WHERE id = $1)
-     ));
-
+            u.id,
+            u.first_name,
+            u.last_name,
+            u.email,
+            up.skills,
+            up.current_lat,
+            up.current_lon,
+            6371 * acos(
+                cos(radians(jl.location_lat)) * cos(radians(up.current_lat)) *
+                cos(radians(up.current_lon) - radians(jl.location_lon)) +
+                sin(radians(jl.location_lat)) * sin(radians(up.current_lat))
+            ) AS distance_km
+        FROM
+            user_profiles up
+        JOIN
+            users u ON up.user_id = u.id
+        CROSS JOIN
+            job_location jl
+        WHERE
+            (SELECT array_agg(value::text) FROM jsonb_array_elements(up.skills))
+            &&
+            (SELECT array_agg(value::text) FROM jsonb_array_elements(to_jsonb(jl.required_skills)))
+        ORDER BY
+            distance_km;
     `;
     const result = await query(sql, [jobId]);
     return result.rows;
