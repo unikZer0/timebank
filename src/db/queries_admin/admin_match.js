@@ -12,8 +12,7 @@ export const getJobApplicantsQuery = async (jobId) => {
             u.last_name,
             up.lat as profile_lat,
             up.lon as profile_lon,
-            up.skills as profile_skills,
-            up.available_hours as profile_available_hours
+            up.skills as profile_skills
         FROM job_applications ja
         JOIN users u ON ja.user_id = u.id
         LEFT JOIN user_profiles up ON u.id = up.user_id
