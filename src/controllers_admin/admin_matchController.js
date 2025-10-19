@@ -1,8 +1,24 @@
-import { getJobApplicantsQuery, getAdminJobsQuery, getJobsForMatchingQuery, createAdminMatchQuery, getAdminMatchesQuery, updateAdminMatchQuery, deleteAdminMatchQuery, updateJobApplicationStatusQuery } from "../db/queries_admin/admin_match.js";
+import { getJobApplicantsQuery, getAdminJobsQuery, getJobsForMatchingQuery, createAdminMatchQuery, getAdminMatchesQuery, updateAdminMatchQuery, deleteAdminMatchQuery, updateJobApplicationStatusQuery, getSkilledUsersForJobQuery } from "../db/queries_admin/admin_match.js";
 import { sendJobMatchNotification } from "../services/lineService.js";
 import { findUserById } from "../db/queries/users.js";
 import { getJobByIdQuery } from "../db/queries/jobs.js";
 import { switchToMatchedMenu } from "../services/richMenuService.js";
+
+export const getSkilledUsersForJob = async (req, res) => {
+    try {
+        const rawJobId = req.params.job_id;
+        const match = String(rawJobId).match(/\d+/);
+        if (!match) {
+            return res.status(400).json({ error: 'Invalid job_id parameter' });
+        }
+        const jobId = parseInt(match[0], 10);
+        const users = await getSkilledUsersForJobQuery(jobId);
+        res.json({ users });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
 
 export const getJobApplicants = async (req, res) => {
     try {
@@ -187,5 +203,3 @@ export const updateJobApplicationStatus = async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
-
-

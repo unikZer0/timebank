@@ -180,3 +180,31 @@ export const getJobsForMatchingQuery = async () => {
     const result = await query(sql);
     return result.rows;
 };
+
+export const getSkilledUsersForJobQuery = async (jobId) => {
+    const sql = `
+        SELECT
+    u.id,
+    u.first_name,
+    u.last_name,
+    u.email,
+    up.skills,
+    up.current_lat,
+    up.current_lon
+FROM
+    user_profiles up
+JOIN
+    users u ON up.user_id = u.id
+WHERE
+    (SELECT array_agg(value::text)
+     FROM jsonb_array_elements(up.skills)) 
+    && 
+    (SELECT array_agg(value::text)
+     FROM jsonb_array_elements(
+         (SELECT to_jsonb(required_skills) FROM jobs WHERE id = $1)
+     ));
+
+    `;
+    const result = await query(sql, [jobId]);
+    return result.rows;
+};
