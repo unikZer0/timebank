@@ -3,10 +3,10 @@ import { createWallet } from "../queries/wallets.js";
 export const getUnverifiedUsersQuery = async () => {
     const sql = `
         SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.national_id, u.dob, u.created_at,
-               up.lat, up.lon, up.skills, up.available_hours, up.household
+               up.lat, up.lon, up.skills, up.household,u.status
         FROM users u
         LEFT JOIN user_profiles up ON u.id = up.user_id
-        WHERE u.status = 'pending'
+
         ORDER BY u.created_at DESC
     `;
     const result = await query(sql);
@@ -16,7 +16,7 @@ export const getUnverifiedUsersQuery = async () => {
 export const getUserDetailsQuery = async (userId) => {
     const sql = `
         SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.national_id, u.dob, u.created_at,
-               up.lat, up.lon, up.skills, up.available_hours, up.household
+               up.lat, up.lon, up.skills, up.household
         FROM users u
         LEFT JOIN user_profiles up ON u.id = up.user_id
         WHERE u.id = $1
