@@ -1,4 +1,4 @@
-import { createJobAppQuery,getJobAppsByUserQuery,updateJobAppStatusQuery, getJobApplicationsByJobIdQuery } from '../db/queries/job_app.js';
+import { createJobAppQuery,getJobAppsByUserQuery,updateJobAppStatusQuery, getJobApplicationsByJobIdQuery, getAllJobAppsQuery } from '../db/queries/job_app.js';
 import { sendJobApplicationNotification } from '../services/lineService.js';
 import { query } from '../db/prosgresql.js';
 
@@ -42,16 +42,7 @@ export const postJobApp = async (req, res) => {
                 // Send confirmation message to applicant
                 if (applicantData.line_user_id) {
                     const { sendLineMessage } = await import('../services/lineService.js');
-                    await sendLineMessage(applicantData.line_user_id, ` คุณได้สมัครงาน "${jobData.title}" เรียบร้อยแล้ว!
-
-รางวัล: ${jobData.time_balance_hours} ชั่วโมง
-
-ผู้จ้างจะพิจารณาใบสมัครของคุณและแจ้งผลกลับมา
-
-คุณสามารถตรวจสอบสถานะการสมัครได้ที่:
-${process.env.FRONTEND_URL || 'http://localhost:3001'}/my-jobs
-
-ขอบคุณที่ใช้บริการ TimeBank!`);
+                    await sendLineMessage(applicantData.line_user_id, ` คุณได้สมัครงาน \"${jobData.title}\" เรียบร้อยแล้ว!\n\nรางวัล: ${jobData.time_balance_hours} ชั่วโมง\n\nผู้จ้างจะพิจารณาใบสมัครของคุณและแจ้งผลกลับมา\n\nคุณสามารถตรวจสอบสถานะการสมัครได้ที่:\n${process.env.FRONTEND_URL || 'http://localhost:3001'}/my-jobs\n\nขอบคุณที่ใช้บริการ TimeBank!`);
                 }
             }
         } catch (notificationError) {
@@ -113,9 +104,19 @@ export const getJobApplications = async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching job applications:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
             error: 'Internal server error' 
         });
     }
 };
+
+export const getAllJobApps = async (req, res) => {
+    try {
+        const applications = await getAllJobAppsQuery();
+        res.json({ applications });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
