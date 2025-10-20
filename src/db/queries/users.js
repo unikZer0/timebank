@@ -11,6 +11,12 @@ export const createUser = async ({ first_name, last_name, email, passwordHash, n
 };
 
 
+export const findUserNationalId = async (national_id) => {
+  const sql = `SELECT id FROM users WHERE national_id = $1 LIMIT 1`;
+  const result = await query(sql, [national_id]);
+  return result.rows[0] || null;
+};
+
 export const findUserByEmail = async (email) => {
   const sql = `SELECT id, email, password_hash, role FROM users WHERE email = $1 LIMIT 1`;
   const result = await query(sql, [email]);

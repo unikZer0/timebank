@@ -2,11 +2,12 @@ import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
-import { createUser, findUserByEmail,searchUsersByNameOrId,findUserPhone,createUserProfile, findUserByIdentifier, updateRememberToken, clearRememberToken, findUserByResetToken, updateResetToken, updatePassword, updateUserCurrentLocation, getAllUserSkills } from "../db/queries/users.js";
+import { createUser, findUserByEmail,searchUsersByNameOrId,findUserPhone,createUserProfile, findUserByIdentifier, updateRememberToken, clearRememberToken, findUserByResetToken, updateResetToken, updatePassword, updateUserCurrentLocation, getAllUserSkills, findUserNationalId } from "../db/queries/users.js";
 import { createWallet } from "../db/queries/wallets.js";
 import { notifyAdminsNewUser } from "../queues/notificationQueue.js";
 import { handleLineLoginCallback } from "../services/lineService.js";
 import { query } from "../db/prosgresql.js";
+import { validateThaiNationalId, extractNationalIdInfo, formatNationalId } from "../utils/nationalIdValidator.js";
 import { log } from "console";
 dotenv.config();
 
@@ -45,6 +46,10 @@ export const register = async (req, res) => {
         return res.status(502).json({ message: 'Failed to fetch external data' });
         }
 
+    if (!apiUser) {
+      return res.status(404).json({ message: 'National ID not found in verification system' });
+    }
+
     const household = apiUser.family_id;
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
@@ -78,6 +83,7 @@ export const register = async (req, res) => {
     }
     
     res.status(201).json({
+      success: true,
       message:"Registration successful. Your account is pending verification. You will be notified once approved by an administrator.", 
       user: { 
         id: user.id, 
@@ -490,6 +496,93 @@ export const searchUserByIdCard = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error'
+    });
+  }
+};
+
+/**
+ * Real-time National ID validation endpoint
+ * Validates Thai National ID format and checksum when user types 13 digits
+ */
+export const validateNationalId = async (req, res) => {
+  try {
+    const { national_id } = req.body;
+    
+    if (!national_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'National ID is required',
+        errorCode: 'MISSING_NATIONAL_ID'
+      });
+    }
+
+    // Clean the input (remove any non-digit characters)
+    const cleanId = national_id.replace(/\D/g, '');
+    
+    // Only validate if exactly 13 digits
+    if (cleanId.length !== 13) {
+      return res.status(400).json({
+        success: false,
+        message: 'National ID must be exactly 13 digits',
+        errorCode: 'INVALID_LENGTH',
+        currentLength: cleanId.length
+      });
+    }
+
+    // Validate using Thai National ID algorithm
+    const validation = validateThaiNationalId(cleanId);
+    
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: validation.message,
+        errorCode: validation.errorCode,
+        nationalId: cleanId
+      });
+    }
+
+    // Check if National ID already exists in database
+    const existingUser = await findUserNationalId(cleanId);
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'This National ID is already registered',
+        errorCode: 'ALREADY_REGISTERED',
+        nationalId: cleanId
+      });
+    }
+
+    // Check against external verification system
+    let apiUser;
+    try {
+      const apiRes = await fetch('https://pub-f1ab9efe03eb4ce7afd952fc03688236.r2.dev/mock_thai_citizens_with_criminal.json');
+      const json = await apiRes.json();
+      apiUser = json.data.find(u => u.national_id === cleanId);
+    } catch (err) {
+      console.error('External API fetch failed during validation:', err);
+      // Don't fail validation if external API is down, just log the error
+    }
+
+    // Extract additional information from National ID
+    const idInfo = extractNationalIdInfo(cleanId);
+    
+    // Return successful validation with additional info
+    res.json({
+      success: true,
+      message: 'Valid National ID',
+      nationalId: cleanId,
+      formattedId: formatNationalId(cleanId),
+      idInfo: idInfo,
+      isInVerificationSystem: !!apiUser,
+      household: apiUser?.family_id || null
+    });
+
+  } catch (error) {
+    console.error('Error validating National ID:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during validation',
+      errorCode: 'SERVER_ERROR'
     });
   }
 };

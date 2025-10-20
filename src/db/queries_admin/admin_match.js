@@ -32,13 +32,13 @@ export const createAdminMatchQuery = async (job_id, user_id, reason) => {
     `;
     const result = await query(sql, [job_id, user_id, reason]);
     
-    // Automatically create a job application with 'applied' status when admin creates a match
+    // Automatically create a job application with 'matched' status when admin creates a match
     try {
         await query(
-            'INSERT INTO job_applications (job_id, user_id, status) VALUES ($1, $2, $3) ON CONFLICT (job_id, user_id) DO NOTHING',
-            [job_id, user_id, 'applied']
+            'INSERT INTO job_applications (job_id, user_id, status) VALUES ($1, $2, $3) ON CONFLICT (job_id, user_id) DO UPDATE SET status = $3',
+            [job_id, user_id, 'matched']
         );
-        console.log(`Job application created for admin match: job ${job_id}, user ${user_id}`);
+        console.log(`Job application created/updated for admin match: job ${job_id}, user ${user_id} with status 'matched'`);
     } catch (error) {
         console.error('Error creating job application for admin match:', error);
         // Don't throw error here as the admin match was created successfully

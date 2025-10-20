@@ -357,12 +357,85 @@ export const switchToMainMenu = async (userId) => {
 };
 
 /**
+ * Switch user to accepted jobs rich menu
+ * @param {string} userId - LINE user ID
+ */
+export const switchToAcceptJobMenu = async (userId) => {
+  try {
+    // Use the same rich menu for everything - the matched menu
+    const richMenuId = process.env.LINE_MATCHED_RICH_MENU_ID;
+
+    if (!richMenuId) {
+      console.warn('LINE_MATCHED_RICH_MENU_ID not configured, skipping rich menu switch');
+      return false;
+    }
+
+    // First unlink any existing rich menu
+    await unlinkRichMenuFromUser(userId);
+
+    // Link the rich menu
+    await linkRichMenuToUser(userId, richMenuId);
+
+    console.log(` User ${userId} switched to rich menu`);
+    return true;
+
+  } catch (error) {
+    console.error('Error switching to rich menu:', error);
+    return false;
+  }
+};
+
+/**
+ * Clear all existing rich menus
+ * This function deletes all rich menus from the LINE account
+ */
+export const clearAllRichMenus = async () => {
+  try {
+    console.log('🧹 Clearing all existing rich menus...');
+    
+    // Get list of all rich menus
+    const response = await fetch('https://api.line.me/v2/bot/richmenu/list', {
+      headers: {
+        'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to get rich menu list: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const richMenus = data.richmenus || [];
+    
+    console.log(`📋 Found ${richMenus.length} rich menus to delete`);
+    
+    // Delete each rich menu
+    for (const menu of richMenus) {
+      try {
+        console.log(`🗑️ Deleting: ${menu.richMenuId} - ${menu.name}`);
+        await deleteRichMenu(menu.richMenuId);
+        console.log(`✅ Deleted: ${menu.richMenuId}`);
+      } catch (error) {
+        console.error(`❌ Failed to delete ${menu.richMenuId}:`, error.message);
+      }
+    }
+    
+    console.log('✅ All rich menus cleared successfully');
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Error clearing rich menus:', error);
+    throw error;
+  }
+};
+
+/**
  * Create default rich menus for TimeBank
  * This function creates the standard rich menus used by the app
  */
 export const createDefaultRichMenus = async () => {
   try {
-    console.log('Creating matched rich menu for TimeBank...');
+    console.log('Creating rich menus for TimeBank...');
 
     // Matched Menu (for users with active job matches) - Only Confirm Job
     const matchedMenuData = {
@@ -383,7 +456,7 @@ export const createDefaultRichMenus = async () => {
           },
           action: {
             type: "postback",
-            data: "action=confirm_job"
+            data: "action=accept_job"
           }
         }
       ]
@@ -391,18 +464,18 @@ export const createDefaultRichMenus = async () => {
 
     const matchedMenu = await createRichMenu(matchedMenuData);
 
-    console.log(' Matched rich menu created successfully');
-    console.log('Matched Menu ID:', matchedMenu.richMenuId);
+    console.log(' Rich menu created successfully');
+    console.log('Rich Menu ID:', matchedMenu.richMenuId);
     console.log('');
     console.log('Add this to your .env file:');
     console.log(`LINE_MATCHED_RICH_MENU_ID=${matchedMenu.richMenuId}`);
 
     return {
-      matchedMenuId: matchedMenu.richMenuId
+      richMenuId: matchedMenu.richMenuId
     };
 
   } catch (error) {
-    console.error('Error creating matched rich menu:', error);
+    console.error('Error creating rich menus:', error);
     throw error;
   }
 };

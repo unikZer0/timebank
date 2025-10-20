@@ -27,7 +27,18 @@ export const handleLineWebhookEndpoint = async (req, res) => {
     logLineUserIds(events);
     
     for (const event of events) {
-      console.log('Processing LINE event:', event.type, event);
+      console.log('=== PROCESSING LINE EVENT ===');
+      console.log('Event Type:', event.type);
+      console.log('Event Source:', event.source);
+      console.log('Full Event Object:', JSON.stringify(event, null, 2));
+      
+      // Special logging for postback events (rich menu clicks)
+      if (event.type === 'postback') {
+        console.log('🎯 RICH MENU CLICK DETECTED!');
+        console.log('Postback Data:', event.postback?.data);
+        console.log('User ID:', event.source?.userId);
+        console.log('Timestamp:', event.timestamp);
+      }
     
       if (event.type === 'follow' && event.source?.userId) {
         const lineUserId = event.source.userId;

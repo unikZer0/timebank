@@ -83,7 +83,7 @@ router.delete('/:richMenuId', deleteRichMenuController);
 
 /**
  * @route POST /richmenu/create-default
- * @desc Create default rich menus for TimeBank
+ * @desc Clear all existing rich menus and create a fresh one
  * @access Admin
  */
 router.post('/create-default', createDefaultRichMenusController);

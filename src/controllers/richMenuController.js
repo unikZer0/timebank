@@ -7,6 +7,7 @@ import {
   listRichMenus,
   deleteRichMenu,
   createDefaultRichMenus,
+  clearAllRichMenus,
   switchToMatchedMenu,
   switchToMainMenu
 } from '../services/richMenuService.js';
@@ -193,15 +194,21 @@ export const deleteRichMenuController = async (req, res) => {
 
 /**
  * Create default rich menus for TimeBank
+ * This will first clear all existing rich menus, then create a fresh one
  */
 export const createDefaultRichMenusController = async (req, res) => {
   try {
+    console.log('🧹 Clearing all existing rich menus...');
+    await clearAllRichMenus();
+    
+    console.log('🎯 Creating fresh rich menu...');
     const result = await createDefaultRichMenus();
     
     res.status(201).json({
       success: true,
-      message: 'Default rich menus created successfully',
-      richMenus: result
+      message: 'Rich menus cleared and recreated successfully',
+      richMenuId: result.richMenuId,
+      note: 'Add this to your .env file: LINE_MATCHED_RICH_MENU_ID=' + result.richMenuId
     });
 
   } catch (error) {

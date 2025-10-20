@@ -1,5 +1,6 @@
 import { createJobAppQuery,getJobAppsByUserQuery,updateJobAppStatusQuery, getJobApplicationsByJobIdQuery } from '../db/queries/job_app.js';
 import { sendJobApplicationNotification } from '../services/lineService.js';
+import { switchToAcceptJobMenu } from '../services/richMenuService.js';
 import { query } from '../db/prosgresql.js';
 
 export const postJobApp = async (req, res) => {
@@ -46,7 +47,7 @@ export const postJobApp = async (req, res) => {
 
 รางวัล: ${jobData.time_balance_hours} ชั่วโมง
 
-ผู้จ้างจะพิจารณาใบสมัครของคุณและแจ้งผลกลับมา
+ผู้จ้างจะพิจารณาการสมัคของคุณและแจ้งผลกลับมา
 
 คุณสามารถตรวจสอบสถานะการสมัครได้ที่:
 ${process.env.FRONTEND_URL || 'http://localhost:3001'}/my-jobs
@@ -82,6 +83,30 @@ export const getJobAppsByUser = async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 }
+
+export const getMyJobApplications = async (req, res) => {
+    try {
+        const userId = req.userId;
+        if (!userId) {
+            return res.status(401).json({ 
+                success: false,
+                error: 'User not authenticated' 
+            });
+        }
+
+        const applications = await getJobAppsByUserQuery(userId);
+        res.json({ 
+            success: true,
+            applications: applications 
+        });
+    } catch (error) {
+        console.error('Error fetching my job applications:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Internal server error' 
+        });
+    }
+}
 export const updateJobAppStatus = async (req, res) => {
     try {
         const { id } = req.params;
@@ -90,6 +115,29 @@ export const updateJobAppStatus = async (req, res) => {
         const success = await updateJobAppStatusQuery(id, status, employerId);
         if (!success) {
             return res.status(403).json({ error: 'Unauthorized or application not found' });
+        }
+
+        // If status is 'accepted', switch user to accepted jobs rich menu
+        if (status === 'accepted') {
+            try {
+                // Get the user's LINE user ID
+                const userQuery = `
+                    SELECT u.line_user_id 
+                    FROM job_applications ja
+                    JOIN users u ON ja.user_id = u.id
+                    WHERE ja.id = $1
+                `;
+                const userResult = await query(userQuery, [id]);
+                
+                if (userResult.rows.length > 0 && userResult.rows[0].line_user_id) {
+                    const lineUserId = userResult.rows[0].line_user_id;
+                    await switchToAcceptJobMenu(lineUserId);
+                    console.log(`Switched user ${lineUserId} to accept job rich menu`);
+                }
+            } catch (richMenuError) {
+                console.error('Error switching to accept job rich menu:', richMenuError);
+                // Don't fail the status update if rich menu switch fails
+            }
         }
 
         res.json({ success: true, message: 'Status updated' });
