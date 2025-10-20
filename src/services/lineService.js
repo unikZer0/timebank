@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { calculateDistance, formatDistance, getLocationDescription } from '../utils/locationUtils.js';
 import { query } from '../db/prosgresql.js';
+import { switchToAcceptJobMenu } from './richMenuService.js';
 dotenv.config();
 
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -463,46 +464,234 @@ export const logLineUserIds = (events) => {
 };
 
 /**
+ * Get user's pending job applications (created by admin matches)
+ * @param {string} lineUserId - LINE user ID
+ * @returns {Array} - Array of pending job applications
+ */
+const getUserPendingApplications = async (lineUserId) => {
+  try {
+    const queryText = `
+      SELECT ja.id, ja.job_id, j.title, j.creator_user_id, u.first_name, u.last_name, am.reason
+      FROM job_applications ja
+      JOIN jobs j ON ja.job_id = j.id
+      JOIN users u ON j.creator_user_id = u.id
+      JOIN users line_user ON ja.user_id = line_user.id
+      LEFT JOIN admin_matches am ON ja.job_id = am.job_id AND ja.user_id = am.user_id
+      WHERE line_user.line_user_id = $1 
+      AND ja.status = 'applied'
+      ORDER BY ja.applied_at DESC
+      LIMIT 5
+    `;
+    
+    const result = await query(queryText, [lineUserId]);
+    return result.rows;
+  } catch (error) {
+    console.error('Error getting user pending applications:', error);
+    return [];
+  }
+};
+
+
+/**
+ * Accept a job application (change status to accepted)
+ * @param {string} lineUserId - LINE user ID
+ * @param {number} applicationId - Application ID to accept
+ * @returns {Object} - Result of the operation
+ */
+const acceptJobApplication = async (lineUserId, applicationId) => {
+  try {
+    // First, verify the application belongs to this user
+    const verifyQuery = `
+      SELECT ja.id, ja.job_id, j.title, j.creator_user_id
+      FROM job_applications ja
+      JOIN jobs j ON ja.job_id = j.id
+      JOIN users u ON ja.user_id = u.id
+      WHERE ja.id = $1 AND u.line_user_id = $2
+    `;
+    
+    const verifyResult = await query(verifyQuery, [applicationId, lineUserId]);
+    
+    if (verifyResult.rows.length === 0) {
+      return { success: false, message: 'Application not found or not authorized' };
+    }
+    
+    const application = verifyResult.rows[0];
+    
+    // Check if user already has an active (accepted) job
+    const activeJobQuery = `
+      SELECT ja.id, j.title
+      FROM job_applications ja
+      JOIN jobs j ON ja.job_id = j.id
+      JOIN users u ON ja.user_id = u.id
+      WHERE u.line_user_id = $1 AND ja.status = 'accepted'
+    `;
+    
+    const activeJobResult = await query(activeJobQuery, [lineUserId]);
+    
+    if (activeJobResult.rows.length > 0) {
+      return { 
+        success: false, 
+        message: `คุณมีงานที่กำลังทำอยู่แล้ว: "${activeJobResult.rows[0].title}". กรุณาทำงานให้เสร็จก่อนรับงานใหม่` 
+      };
+    }
+    
+    // Update the application status to accepted
+    const updateQuery = `
+      UPDATE job_applications 
+      SET status = 'accepted' 
+      WHERE id = $1
+    `;
+    
+    await query(updateQuery, [applicationId]);
+    
+    // Switch user to accept job rich menu
+    await switchToAcceptJobMenu(lineUserId);
+    
+    return { 
+      success: true, 
+      message: `Successfully accepted job: ${application.title}`,
+      jobTitle: application.title
+    };
+    
+  } catch (error) {
+    console.error('Error accepting job application:', error);
+    return { success: false, message: 'Failed to accept job application' };
+  }
+};
+
+
+/**
  * Handle LINE webhook events
  * @param {Object} event - LINE webhook event
  */
 export const handleLineWebhook = async (event) => {
   try {
+    console.log('🔍 handleLineWebhook called with event type:', event.type);
+    
     if (event.type === 'postback') {
       // Handle rich menu postback
       const data = event.postback.data;
       const userId = event.source.userId;
-      console.log('LINE postback received:', data, 'from user:', userId);
+      console.log('🎯 RICH MENU POSTBACK PROCESSING:');
+      console.log('  - Data:', data);
+      console.log('  - User ID:', userId);
+      console.log('  - Event:', JSON.stringify(event, null, 2));
       
       // Parse postback data (e.g., "action=accept_job&match_id=123")
       const params = new URLSearchParams(data);
       const action = params.get('action');
       const matchId = params.get('match_id');
       
+      console.log('🔍 Parsed action:', action);
+      console.log('🔍 Parsed matchId:', matchId);
+      
       switch (action) {
         case 'confirm_job':
-          // Send confirmation message first
-          await sendLineMessage(userId, `✅ คุณได้ยืนยันการสมัครงานแล้ว!
+          console.log('✅ Processing confirm_job action');
+          // Get user's pending applications
+          const pendingApps = await getUserPendingApplications(userId);
+          
+          if (pendingApps.length === 0) {
+            await sendLineMessage(userId, `❌ ไม่พบงานที่รอการยืนยัน
 
-ระบบจะแจ้งให้คุณทราบเมื่อมีการอัปเดตสถานะงาน
+คุณยังไม่ได้สมัครงานหรืองานที่สมัครแล้วได้รับการยืนยันแล้ว
 
-คุณสามารถตรวจสอบสถานะงานได้ที่:
-${FRONTEND_URL}/my-jobs
+กรุณาไปที่: ${FRONTEND_URL}/jobs เพื่อหางานที่ต้องการ`);
+            
+            return {
+              type: 'redirect',
+              url: `${FRONTEND_URL}/jobs`
+            };
+          }
+          
+          // If only one pending application, accept it directly
+          if (pendingApps.length === 1) {
+            const result = await acceptJobApplication(userId, pendingApps[0].id);
+            
+            if (result.success) {
+              await sendLineMessage(userId, `✅ ยืนยันการรับงาน "${result.jobTitle}" เรียบร้อยแล้ว!
+
+คุณสามารถดูรายละเอียดงานได้ที่:
+${FRONTEND_URL}/provider-jobs
 
 ขอบคุณที่ใช้บริการ TimeBank!`);
+              
+              return {
+                type: 'redirect',
+                url: `${FRONTEND_URL}/provider-jobs`
+              };
+            } else {
+              await sendLineMessage(userId, ` ${result.message}`);
+              return {
+                type: 'reply',
+                message: 'เกิดข้อผิดพลาดในการยืนยันงาน'
+              };
+            }
+          } else {
+            // Multiple pending applications - show list
+            let message = ` งานที่รอการยืนยัน (${pendingApps.length} งาน):\n\n`;
+            pendingApps.forEach((app, index) => {
+              message += `${index + 1}. ${app.title}\n   โดย: ${app.first_name} ${app.last_name}\n\n`;
+            });
+            message += `กรุณาไปที่: ${FRONTEND_URL}/provider-jobs เพื่อยืนยันงาน`;
+            
+            await sendLineMessage(userId, message);
+            
+            return {
+              type: 'redirect',
+              url: `${FRONTEND_URL}/provider-jobs`
+            };
+          }
+
+
+        case 'accept_job':
+          console.log('✅ Processing accept_job action');
+          // Accept the first pending application and redirect to provider jobs
+          const pendingApps2 = await getUserPendingApplications(userId);
+          console.log('🔍 Found pending apps:', pendingApps2.length);
           
-          // Then redirect to job confirmation page
-          return {
-            type: 'redirect',
-            url: `${FRONTEND_URL}/job-confirm`
-          };
+          if (pendingApps2.length === 0) {
+            await sendLineMessage(userId, `ไม่พบงานที่รอการยืนยัน
+
+กรุณาไปที่เว็บไซต์เพื่อดูงานของคุณ`);
+            
+            return {
+              type: 'redirect',
+              url: `${FRONTEND_URL}/provider-jobs`
+            };
+          }
           
+          // Accept the first pending application
+          const result = await acceptJobApplication(userId, pendingApps2[0].id);
+          
+          if (result.success) {
+            await sendLineMessage(userId, `✅ รับงาน "${result.jobTitle}" เรียบร้อยแล้ว!
+
+กำลังนำคุณไปยังเว็บไซต์...`);
+            
+            return {
+              type: 'redirect',
+              url: `${FRONTEND_URL}/provider-jobs`
+            };
+          } else {
+            await sendLineMessage(userId, `❌ ${result.message}
+
+กำลังนำคุณไปยังเว็บไซต์...`);
+            
+            return {
+              type: 'redirect',
+              url: `${FRONTEND_URL}/provider-jobs`
+            };
+          }
+
         default:
-          console.log('Unknown postback action:', action);
-      return {
-        type: 'reply',
-        message: 'การดำเนินการไม่รู้จัก กรุณาลองใหม่อีกครั้ง'
-      };
+          console.log('❌ Unknown postback action:', action);
+          console.log('❌ Full postback data:', data);
+          console.log('❌ User ID:', userId);
+          return {
+            type: 'reply',
+            message: 'การดำเนินการไม่รู้จัก กรุณาลองใหม่อีกครั้ง'
+          };
       }
     }
     
@@ -539,7 +728,17 @@ export const handleLineLoginCallback = async (code, state) => {
     const LINE_LOGIN_CHANNEL_SECRET = process.env.LINE_LOGIN_CHANNEL_SECRET;
     const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
 
+    console.log('LINE Login credentials check:', {
+      channelId: LINE_LOGIN_CHANNEL_ID ? 'configured' : 'missing',
+      channelSecret: LINE_LOGIN_CHANNEL_SECRET ? 'configured' : 'missing',
+      backendUrl: BACKEND_URL
+    });
+
     if (!LINE_LOGIN_CHANNEL_ID || !LINE_LOGIN_CHANNEL_SECRET) {
+      console.error('LINE Login credentials not configured:', {
+        channelId: LINE_LOGIN_CHANNEL_ID,
+        channelSecret: LINE_LOGIN_CHANNEL_SECRET ? 'set' : 'not set'
+      });
       throw new Error('LINE Login credentials not configured');
     }
 

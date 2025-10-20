@@ -11,6 +11,9 @@ services:
     volumes:
       - ./src:/usr/src/app/src:cached
       - ./templates:/usr/src/app/templates:cached
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     depends_on:
       - postgres
       - redis

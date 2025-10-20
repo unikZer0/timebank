@@ -84,7 +84,12 @@ export const getJobsByUserQuery = async (userId) => {
             j.end_time,
             j.broadcasted,
             j.created_at,
-            COUNT(ja.id) as application_count
+            COUNT(ja.id) as application_count,
+            CASE 
+                WHEN EXISTS(SELECT 1 FROM job_applications ja2 WHERE ja2.job_id = j.id AND ja2.status = 'complete') 
+                THEN true 
+                ELSE false 
+            END as has_complete_application
         FROM jobs j
         LEFT JOIN job_applications ja ON j.id = ja.job_id
         WHERE j.creator_user_id = $1

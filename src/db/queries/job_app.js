@@ -21,6 +21,18 @@ export const createJobAppQuery = async ({ jobId, userId
         throw err;
     }
 
+    // check if user has any active (accepted) job that is not completed
+    const activeJobResult = await query(
+        'SELECT id FROM job_applications WHERE user_id = $1 AND status = $2',
+        [userId, 'accepted']
+    );
+    
+    if (activeJobResult.rows.length > 0) {
+        const err = new Error('You can only have one active job at a time. Please complete your current job before applying for new ones.');
+        err.status = 400;
+        throw err;
+    }
+
     // check if job exists
     const jobResult = await query('SELECT id, broadcasted FROM jobs WHERE id = $1', [jobId]);
     if (!jobResult.rows[0]) {
@@ -40,20 +52,33 @@ export const createJobAppQuery = async ({ jobId, userId
 export const getJobAppsByUserQuery = async (userId) => {
     const sql =` SELECT 
             ja.id,
+            ja.job_id,
+            ja.user_id,
             ja.status,
             ja.applied_at,
-            j.id as job_id,
             j.title,
             j.description,
             j.required_skills,
             j.location_lat,
             j.location_lon,
-            CONCAT(u.first_name, ' ', u.last_name) as employer_name,
-            u.email as employer_email,
-            u.phone as employer_phone
+            j.time_balance_hours,
+            j.start_time,
+            j.end_time,
+            j.broadcasted,
+            j.created_at,
+            u.first_name as creator_first_name,
+            u.last_name as creator_last_name,
+            u.email as creator_email,
+            u.phone as creator_phone,
+            up.skills,
+            up.lat,
+            up.lon,
+            up.current_lat,
+            up.current_lon
         FROM job_applications ja
         JOIN jobs j ON ja.job_id = j.id
         JOIN users u ON j.creator_user_id = u.id
+        LEFT JOIN user_profiles up ON ja.user_id = up.user_id
         WHERE ja.user_id = $1
         ORDER BY ja.applied_at DESC`
     const jobapp= await query(sql,[userId]);

@@ -1,7 +1,6 @@
 import express from 'express';
 import { handleLineWebhookEndpoint } from '../controllers/lineWebhookController.js';
 import { getJobMatchDetails, acceptJobMatch, rejectJobMatch } from '../controllers/jobMatchController.js';
-import { lineLoginCallback } from '../controllers/authController.js';
 import { authMiddleware } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
@@ -18,8 +17,7 @@ router.get('/webhook/line', (req, res) => {
   });
 });
 
-// LINE Login callback endpoint (no auth required - handles OAuth flow)
-router.get('/auth/line/callback', lineLoginCallback);
+// LINE Login callback endpoint is handled directly in index.js
 
 // Job match routes (protected)
 router.get('/job-match/:matchId', authMiddleware, getJobMatchDetails);

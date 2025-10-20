@@ -83,7 +83,7 @@ const handleNewUserRegistration = async (data) => {
           user_name: `${user.first_name} ${user.last_name}`,
           user_email: user.email,
           registration_date: new Date(user.created_at).toLocaleDateString(),
-          admin_panel_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/admin/verification`,
+          admin_panel_url: `${ 'http://localhost:3002'}/admin/verification`,
           year: new Date().getFullYear()
         }
       });

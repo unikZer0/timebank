@@ -15,19 +15,58 @@ import adminMatchRouter from './routes_admin/admin_matchRoutes.js';
 import lineRouter from './routes/lineRoutes.js';
 import richMenuRouter from './routes/richMenuRoutes.js';
 import { handleLineWebhookEndpoint } from './controllers/lineWebhookController.js';
+import { lineLoginCallback } from './controllers/authController.js';
 dotenv.config();
 
 const app = express();
 
 // middleware
+const allowedOrigins = [
+  'http://localhost:3001',
+  'http://localhost:3002'
+];
+
 app.use(cors({
-  origin: [, 'http://localhost:3001'],
-  credentials: true 
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Public rich menu creation endpoint (no auth required for testing)
+app.post('/api/richmenu/create-default', async (req, res) => {
+  try {
+    const { clearAllRichMenus, createDefaultRichMenus } = await import('./src/services/richMenuService.js');
+    
+    console.log('🧹 Clearing all existing rich menus...');
+    await clearAllRichMenus();
+    
+    console.log('🎯Creating fresh rich menu...');
+    const result = await createDefaultRichMenus();
+    
+    res.status(201).json({
+      success: true,
+      message: 'Rich menus cleared and recreated successfully',
+      richMenuId: result.richMenuId,
+      note: 'Add this to your .env file: LINE_MATCHED_RICH_MENU_ID=' + result.richMenuId
+    });
+
+  } catch (error) {
+    console.error('Error creating default rich menus:', error);
+    res.status(500).json({ 
+      error: 'Failed to create default rich menus',
+      details: error.message 
+    });
+  }
+});
 
 //=======admin
 app.use('/api/admin', verificationRouter);
@@ -57,6 +96,9 @@ app.use('/api', userProfileRouter);
 
 //LINE webhook and job match routes
 app.use('/api', lineRouter);
+
+// LINE Login callback (no /api prefix for LINE platform)
+app.get('/auth/line/callback', lineLoginCallback);
 
 // Rich menu management routes
 app.use('/api/richmenu', richMenuRouter);
