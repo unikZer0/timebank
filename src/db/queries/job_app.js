@@ -223,3 +223,25 @@ const transferJobHoursToWallet = async (workerId, hours, applicationId) => {
         throw error;
     }
 };
+
+export const getAllJobAppsQuery = async () => {
+    const sql =` SELECT 
+            ja.id,
+            ja.status,
+            ja.applied_at,
+            j.id as job_id,
+            j.title,
+            j.description,
+            j.required_skills,
+            j.location_lat,
+            j.location_lon,
+            CONCAT(u.first_name, ' ', u.last_name) as employer_name,
+            u.email as employer_email,
+            u.phone as employer_phone
+        FROM job_applications ja
+        JOIN jobs j ON ja.job_id = j.id
+        JOIN users u ON j.creator_user_id = u.id
+        ORDER BY ja.applied_at DESC`
+    const jobapp= await query(sql);
+    return jobapp.rows;
+};

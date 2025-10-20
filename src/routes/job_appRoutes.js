@@ -9,5 +9,6 @@ router.get('/jobapp/user/me', authMiddleware, getMyJobApplications);
 router.get('/jobapp/user/:userId', authMiddleware, getJobAppsByUser);
 router.put('/jobapp/:id/status', authMiddleware, updateJobAppStatus);
 router.get('/jobs/:jobId/applications', authMiddleware, getJobApplications);
+router.get('/jobapp', authMiddleware, getAllJobApps);
 
 export default router;

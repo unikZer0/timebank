@@ -1,4 +1,4 @@
-import { createJobAppQuery,getJobAppsByUserQuery,updateJobAppStatusQuery, getJobApplicationsByJobIdQuery } from '../db/queries/job_app.js';
+import { createJobAppQuery,getJobAppsByUserQuery,updateJobAppStatusQuery, getJobApplicationsByJobIdQuery, getAllJobAppsQuery } from '../db/queries/job_app.js';
 import { sendJobApplicationNotification } from '../services/lineService.js';
 import { switchToAcceptJobMenu } from '../services/richMenuService.js';
 import { query } from '../db/prosgresql.js';
@@ -161,9 +161,19 @@ export const getJobApplications = async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching job applications:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
             error: 'Internal server error' 
         });
     }
 };
+
+export const getAllJobApps = async (req, res) => {
+    try {
+        const applications = await getAllJobAppsQuery();
+        res.json({ applications });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
