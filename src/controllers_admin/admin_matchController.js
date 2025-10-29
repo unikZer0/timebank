@@ -23,16 +23,45 @@ export const getSkilledUsersForJob = async (req, res) => {
 export const getJobApplicants = async (req, res) => {
     try {
         const rawJobId = req.params.job_id;
+        if (!rawJobId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing job_id parameter',
+                message: 'กรุณาระบุ job_id ที่ต้องการดูข้อมูล'
+            });
+        }
+
         const match = String(rawJobId).match(/\d+/);
         if (!match) {
-            return res.status(400).json({ error: 'Invalid job_id parameter' });
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid job_id format',
+                message: 'รูปแบบ job_id ไม่ถูกต้อง กรุณาใส่เฉพาะตัวเลขเท่านั้น'
+            });
         }
+
         const jobId = parseInt(match[0], 10);
         const applicants = await getJobApplicantsQuery(jobId);
-        res.json({ applicants });
+
+        if (applicants.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'No applicants found',
+                message: `ไม่พบข้อมูลผู้สมัครสำหรับงาน ID: ${jobId}`
+            });
+        }
+
+        res.json({
+            success: true,
+            applicants
+        });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Error in getJobApplicants:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: 'เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง'
+        });
     }
 };
 
@@ -211,16 +240,64 @@ export const deleteAdminMatch = async (req, res) => {
 export const updateJobApplicationStatus = async (req, res) => {
     try {
         const rawId = req.params.id;
+        if (!rawId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing application ID',
+                message: 'กรุณาระบุ ID ของใบสมัครที่ต้องการอัพเดท'
+            });
+        }
+
         const match = String(rawId).match(/\d+/);
         if (!match) {
-            return res.status(400).json({ error: 'Invalid id parameter' });
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid application ID format',
+                message: 'รูปแบบ ID ไม่ถูกต้อง กรุณาใส่เฉพาะตัวเลขเท่านั้น'
+            });
         }
+
         const id = parseInt(match[0], 10);
         const { status } = req.body;
+
+        if (!status) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing status',
+                message: 'กรุณาระบุสถานะที่ต้องการอัพเดท'
+            });
+        }
+
+        const validStatuses = ['pending', 'accepted', 'rejected', 'complete'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid status',
+                message: `สถานะไม่ถูกต้อง กรุณาเลือกจาก: ${validStatuses.join(', ')}`
+            });
+        }
+
         const updatedApplication = await updateJobApplicationStatusQuery(id, status);
-        res.json(updatedApplication);
+        
+        if (!updatedApplication) {
+            return res.status(404).json({
+                success: false,
+                error: 'Application not found',
+                message: `ไม่พบใบสมัครหมายเลข ${id}`
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `อัพเดทสถานะใบสมัครเป็น ${status} สำเร็จ`,
+            application: updatedApplication
+        });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Error updating job application status:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: 'เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง'
+        });
     }
 };
