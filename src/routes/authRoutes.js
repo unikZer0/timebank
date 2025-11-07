@@ -10,7 +10,6 @@ import {
   getAllSkills,
   searchUserByIdCard,
   lineLoginCallback,
-  validateNationalId
 } from "../controllers/authController.js";
 import { autoLogin } from "../controllers/authController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
@@ -28,7 +27,6 @@ router.put("/update-location", authMiddleware, updateCurrentLocation);
 router.get("/skills", authMiddleware, getAllSkills);
 router.get("/search-by-id-card", authMiddleware, searchUserByIdCard);
 router.get("/line/callback", lineLoginCallback);
-router.post("/validate-national-id", validateNationalId);
 
 
 // //====================== Example admin-only route

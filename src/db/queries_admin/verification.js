@@ -3,9 +3,22 @@ import { createWallet } from "../queries/wallets.js";
 export const getUnverifiedUsersQuery = async () => {
     const sql = `
         SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.national_id, u.dob, u.created_at,
-               up.lat, up.lon, up.skills, up.household,u.status
+               up.lat, up.lon, COALESCE(user_skills_data.skills, '[]'::jsonb) AS skills, up.household,u.status
         FROM users u
         LEFT JOIN user_profiles up ON u.id = up.user_id
+        LEFT JOIN LATERAL (
+            SELECT COALESCE(
+                jsonb_agg(
+                    jsonb_build_object(
+                        'id', s.id,
+                        'name', s.name
+                    ) ORDER BY lower(s.name)
+                ), '[]'::jsonb
+            ) AS skills
+            FROM user_skills us
+            JOIN skills s ON s.id = us.skill_id
+            WHERE us.user_profile_id = up.user_id
+        ) user_skills_data ON true
 
         ORDER BY u.created_at DESC
     `;
@@ -16,9 +29,22 @@ export const getUnverifiedUsersQuery = async () => {
 export const getUserDetailsQuery = async (userId) => {
     const sql = `
         SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.national_id, u.dob, u.created_at,
-               up.lat, up.lon, up.skills, up.household,u.status
+               up.lat, up.lon, COALESCE(user_skills_data.skills, '[]'::jsonb) AS skills, up.household,u.status
         FROM users u
         LEFT JOIN user_profiles up ON u.id = up.user_id
+        LEFT JOIN LATERAL (
+            SELECT COALESCE(
+                jsonb_agg(
+                    jsonb_build_object(
+                        'id', s.id,
+                        'name', s.name
+                    ) ORDER BY lower(s.name)
+                ), '[]'::jsonb
+            ) AS skills
+            FROM user_skills us
+            JOIN skills s ON s.id = us.skill_id
+            WHERE us.user_profile_id = up.user_id
+        ) user_skills_data ON true
         WHERE u.id = $1
     `;
     const result = await query(sql, [userId]);

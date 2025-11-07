@@ -478,7 +478,7 @@ const getUserPendingApplications = async (lineUserId) => {
       JOIN users line_user ON ja.user_id = line_user.id
       LEFT JOIN admin_matches am ON ja.job_id = am.job_id AND ja.user_id = am.user_id
       WHERE line_user.line_user_id = $1 
-      AND ja.status = 'applied'
+      AND ja.status IN ('applied', 'matched')
       ORDER BY ja.applied_at DESC
       LIMIT 5
     `;

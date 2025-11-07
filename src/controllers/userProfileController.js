@@ -1,4 +1,5 @@
 import { query } from '../db/prosgresql.js';
+import { updateUserProfileSkills } from '../db/queries/users.js';
 
 /**
  * Get user profile with stats
@@ -20,7 +21,7 @@ export const getUserProfile = async (req, res) => {
         u.verified,
         u.created_at,
         u.line_user_id,
-        up.skills,
+        COALESCE(user_skills_data.skills, '[]'::jsonb) AS skills,
         up.lat,
         up.lon,
         up.current_lat,
@@ -32,6 +33,19 @@ export const getUserProfile = async (req, res) => {
         COALESCE(stats.people_helped, 0) as people_helped
       FROM users u
       LEFT JOIN user_profiles up ON u.id = up.user_id
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(
+          jsonb_agg(
+            jsonb_build_object(
+              'id', s.id,
+              'name', s.name
+            ) ORDER BY lower(s.name)
+          ), '[]'::jsonb
+        ) AS skills
+        FROM user_skills us
+        JOIN skills s ON s.id = us.skill_id
+        WHERE us.user_profile_id = up.user_id
+      ) user_skills_data ON true
       LEFT JOIN wallets w ON u.id = w.user_id
       LEFT JOIN (
         SELECT 
@@ -108,25 +122,12 @@ export const updateUserProfile = async (req, res) => {
     const userId = req.userId; // From auth middleware
     const { skills, phone } = req.body;
 
-    // Limit skills to maximum 3
-    const limitedSkills = skills ? skills.slice(0, 3) : [];
+    let updatedSkills;
 
-    // Convert skills array to JSON string for PostgreSQL
-    const skillsJson = JSON.stringify(limitedSkills);
+    if (skills !== undefined) {
+      updatedSkills = await updateUserProfileSkills(userId, skills);
+    }
 
-    // Update user profile data
-    const updateProfileQuery = `
-      UPDATE user_profiles 
-      SET 
-        skills = COALESCE($2::jsonb, skills),
-        updated_at = NOW()
-      WHERE user_id = $1
-      RETURNING *
-    `;
-
-    const profileResult = await query(updateProfileQuery, [userId, skillsJson]);
-    
-    // Update user phone if provided
     if (phone !== undefined) {
       const updateUserQuery = `
         UPDATE users 
@@ -141,8 +142,8 @@ export const updateUserProfile = async (req, res) => {
       success: true,
       message: 'Profile updated successfully',
       data: {
-        skills: limitedSkills,
-        phone: phone
+        ...(updatedSkills !== undefined ? { skills: updatedSkills } : {}),
+        ...(phone !== undefined ? { phone } : {})
       }
     });
 

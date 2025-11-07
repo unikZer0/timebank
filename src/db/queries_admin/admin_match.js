@@ -12,10 +12,23 @@ export const getJobApplicantsQuery = async (jobId) => {
             u.last_name,
             up.lat as profile_lat,
             up.lon as profile_lon,
-            up.skills as profile_skills
+            COALESCE(user_skills_data.skills, '[]'::jsonb) as profile_skills
         FROM job_applications ja
         JOIN users u ON ja.user_id = u.id
         LEFT JOIN user_profiles up ON u.id = up.user_id
+        LEFT JOIN LATERAL (
+            SELECT COALESCE(
+                jsonb_agg(
+                    jsonb_build_object(
+                        'id', s.id,
+                        'name', s.name
+                    ) ORDER BY lower(s.name)
+                ), '[]'::jsonb
+            ) AS skills
+            FROM user_skills us
+            JOIN skills s ON s.id = us.skill_id
+            WHERE us.user_profile_id = up.user_id
+        ) user_skills_data ON true
         WHERE ja.job_id = $1
         ORDER BY ja.applied_at DESC
     `;
@@ -184,7 +197,17 @@ export const getJobsForMatchingQuery = async () => {
 export const getSkilledUsersForJobQuery = async (jobId) => {
     const sql = `
         WITH job_location AS (
-            SELECT location_lat, location_lon, required_skills
+            SELECT 
+                location_lat, 
+                location_lon, 
+                required_skills,
+                COALESCE(
+                    ARRAY(
+                        SELECT LOWER(req_skill)
+                        FROM unnest(COALESCE(required_skills, ARRAY[]::text[])) AS req_skill
+                    ),
+                    ARRAY[]::text[]
+                ) AS required_skills_lower
             FROM jobs
             WHERE id = $1
         )
@@ -193,7 +216,7 @@ export const getSkilledUsersForJobQuery = async (jobId) => {
             u.first_name,
             u.last_name,
             u.email,
-            up.skills,
+            COALESCE(skills_data.skills, '[]'::jsonb) AS skills,
             up.current_lat,
             up.current_lon,
             6371 * acos(
@@ -207,10 +230,25 @@ export const getSkilledUsersForJobQuery = async (jobId) => {
             users u ON up.user_id = u.id
         CROSS JOIN
             job_location jl
+        LEFT JOIN LATERAL (
+            SELECT 
+                COALESCE(
+                    jsonb_agg(
+                        jsonb_build_object(
+                            'id', s.id,
+                            'name', s.name
+                        ) ORDER BY lower(s.name)
+                    ), '[]'::jsonb
+                ) AS skills,
+                COALESCE(ARRAY_AGG(LOWER(s.name)), ARRAY[]::text[]) AS skill_names_lower
+            FROM user_skills us
+            JOIN skills s ON s.id = us.skill_id
+            WHERE us.user_profile_id = up.user_id
+        ) skills_data ON true
         WHERE
-            (SELECT array_agg(value::text) FROM jsonb_array_elements(up.skills))
-            &&
-            (SELECT array_agg(value::text) FROM jsonb_array_elements(to_jsonb(jl.required_skills)))
+            (cardinality(jl.required_skills_lower) = 0)
+            OR
+            (skills_data.skill_names_lower && jl.required_skills_lower)
         ORDER BY
             distance_km;
     `;

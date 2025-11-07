@@ -70,7 +70,7 @@ export const getJobAppsByUserQuery = async (userId) => {
             u.last_name as creator_last_name,
             u.email as creator_email,
             u.phone as creator_phone,
-            up.skills,
+            COALESCE(user_skills_data.skills, '[]'::jsonb) AS skills,
             up.lat,
             up.lon,
             up.current_lat,
@@ -79,6 +79,19 @@ export const getJobAppsByUserQuery = async (userId) => {
         JOIN jobs j ON ja.job_id = j.id
         JOIN users u ON j.creator_user_id = u.id
         LEFT JOIN user_profiles up ON ja.user_id = up.user_id
+        LEFT JOIN LATERAL (
+            SELECT COALESCE(
+                jsonb_agg(
+                    jsonb_build_object(
+                        'id', s.id,
+                        'name', s.name
+                    ) ORDER BY lower(s.name)
+                ), '[]'::jsonb
+            ) AS skills
+            FROM user_skills us
+            JOIN skills s ON s.id = us.skill_id
+            WHERE us.user_profile_id = up.user_id
+        ) user_skills_data ON true
         WHERE ja.user_id = $1
         ORDER BY ja.applied_at DESC`
     const jobapp= await query(sql,[userId]);
@@ -96,7 +109,7 @@ export const getJobApplicationsByJobIdQuery = async (jobId, creatorUserId) => {
             u.first_name,
             u.last_name,
             u.email,
-            up.skills,
+            COALESCE(user_skills_data.skills, '[]'::jsonb) AS skills,
             up.lat,
             up.lon,
             up.current_lat,
@@ -104,6 +117,19 @@ export const getJobApplicationsByJobIdQuery = async (jobId, creatorUserId) => {
         FROM job_applications ja
         JOIN users u ON ja.user_id = u.id
         LEFT JOIN user_profiles up ON u.id = up.user_id
+        LEFT JOIN LATERAL (
+            SELECT COALESCE(
+                jsonb_agg(
+                    jsonb_build_object(
+                        'id', s.id,
+                        'name', s.name
+                    ) ORDER BY lower(s.name)
+                ), '[]'::jsonb
+            ) AS skills
+            FROM user_skills us
+            JOIN skills s ON s.id = us.skill_id
+            WHERE us.user_profile_id = up.user_id
+        ) user_skills_data ON true
         JOIN jobs j ON ja.job_id = j.id
         WHERE ja.job_id = $1 AND j.creator_user_id = $2
         ORDER BY ja.applied_at DESC
