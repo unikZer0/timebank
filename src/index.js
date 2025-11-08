@@ -14,6 +14,8 @@ import jobRouter from './routes/jobRoutes.js';
 import adminMatchRouter from './routes_admin/admin_matchRoutes.js';
 import lineRouter from './routes/lineRoutes.js';
 import richMenuRouter from './routes/richMenuRoutes.js';
+import skillsRouter from './routes/skillsRoutes.js';
+import adminNotificationRouter from './routes/adminNotificationRoutes.js';
 import { handleLineWebhookEndpoint } from './controllers/lineWebhookController.js';
 import { lineLoginCallback } from './controllers/authController.js';
 dotenv.config();
@@ -90,6 +92,7 @@ app.use('/api', jobRouter);
 
 //notification routes
 app.use('/api/notifications', notificationRouter);
+app.use('/api/notifications', adminNotificationRouter);
 
 //user profile routes
 app.use('/api', userProfileRouter);
@@ -102,6 +105,9 @@ app.get('/auth/line/callback', lineLoginCallback);
 
 // Rich menu management routes
 app.use('/api/richmenu', richMenuRouter);
+
+// Skills routes
+app.use('/api/skills', skillsRouter);
 
 // LINE webhook endpoint (no /api prefix for LINE platform)
 app.post('/webhook/line', handleLineWebhookEndpoint);
