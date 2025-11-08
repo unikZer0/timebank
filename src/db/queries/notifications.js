@@ -52,3 +52,17 @@ export const getAllAdmins = async () => {
   const result = await query(sql);
   return result.rows;
 };
+
+export const getAdminNotifications = async (limit = 50) => {
+  const sql = `
+    SELECT n.id, n.user_id, n.type, n.message, n.created_at,
+           u.first_name, u.last_name, u.email
+    FROM notifications n
+    LEFT JOIN users u ON n.user_id = u.id
+    WHERE n.type = 'new_user_registration'
+    ORDER BY n.created_at DESC
+    LIMIT $1
+  `;
+  const result = await query(sql, [limit]);
+  return result.rows;
+};
