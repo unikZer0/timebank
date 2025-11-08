@@ -1,4 +1,4 @@
-const skillsQueries = require('../db/queries/skills');
+import * as skillsQueries from '../db/queries/skills.js';
 
 // Create a new skill
 const createSkill = async (req, res) => {
@@ -85,7 +85,7 @@ const deleteSkill = async (req, res) => {
     }
 };
 
-module.exports = {
+export {
     createSkill,
     getAllSkills,
     getSkillById,

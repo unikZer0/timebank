@@ -1,4 +1,4 @@
-const db = require('../prosgresql');
+import db from '../prosgresql.js';
 
 // Create a new skill
 const createSkill = async (name, description) => {
@@ -60,7 +60,7 @@ const deleteSkill = async (id) => {
     return result.rows[0];
 };
 
-module.exports = {
+export {
     createSkill,
     getAllSkills,
     getSkillById,

@@ -1,7 +1,7 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const skillsController = require('../controllers/skillsController');
-const authMiddleware = require('../middlewares/authMiddleware');
+import * as skillsController from '../controllers/skillsController.js';
+import { authMiddleware } from '../middlewares/authMiddleware.js';
 
 // Create a new skill (Protected route - requires authentication)
 router.post('/', authMiddleware, skillsController.createSkill);
@@ -18,4 +18,4 @@ router.put('/:id', authMiddleware, skillsController.updateSkill);
 // Delete skill (Protected route - requires authentication)
 router.delete('/:id', authMiddleware, skillsController.deleteSkill);
 
-module.exports = router;
+export default router;
