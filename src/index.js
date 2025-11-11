@@ -8,6 +8,7 @@ import transferRouter from './routes/transferRoutes.js'
 import transactionRouter from './routes/transactionRoutes.js'
 import notificationRouter from './routes/notificationRoutes.js'
 import userProfileRouter from './routes/userProfileRoutes.js'
+import dashboardRouter from './routes_admin/dashboardRoute.js'
 import { rememberMeMiddleware } from "./middlewares/rememberMeMiddleware.js";
 import jobAppRouter from './routes/job_appRoutes.js';
 import jobRouter from './routes/jobRoutes.js';
@@ -80,6 +81,8 @@ app.use('/api', adminMatchRouter);
 app.use('/api/auth', authRouter);
 //=======transfer routes
 app.use('/api', transferRouter);
+//=====dashboard
+app.use('/api', dashboardRouter);
 
 //transaction routes
 app.use('/api', transactionRouter);
